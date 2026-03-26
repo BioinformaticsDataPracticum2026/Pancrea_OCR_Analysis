@@ -18,6 +18,7 @@ To look at the data structure of one of the files, we can do
 ```bash
     zcat idr.optimal_peak.narrowPeak.gz | head
 ```
+<img src="datastruct.png">
 
 ### What each column means?
 
