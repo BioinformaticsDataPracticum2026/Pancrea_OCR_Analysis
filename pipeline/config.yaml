@@ -9,4 +9,6 @@ hal_file: "/ocean/projects/bio230007p/jji5/data/Alignments/10plusway-master.hal"
 halper_output_dir: "/ocean/projects/bio230007p/jji5/output/halper"
 species_1_peak_file: "/ocean/projects/bio230007p/jji5/data/Human_Pancreas_ATAC/peak/idr_reproducibility/idr.optimal_peak.narrowPeak"
 species_2_peak_file: "/ocean/projects/bio230007p/jji5/data/Mouse_Pancreas_ATAC/peak/idr_reproducibility/idr.optimal_peak.narrowPeak"
+temp_dir: "/ocean/projects/bio230007p/jji5/output/temp"
+job_name: "halper_human_pancreas_to_mouse"
 

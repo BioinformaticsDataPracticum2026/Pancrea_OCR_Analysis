@@ -1,73 +1,123 @@
 # run with command: python3 /ocean/projects/bio230007p/jji5/pipeline/ATAC_analysis.py
-
+from dataclasses import dataclass
 from pathlib import Path
-import os
-import yaml
 import subprocess
+import yaml
+
+@dataclass
+class HalperOneRunConfig:
+    source_species: str
+    target_species: str
+    organ: str
+    halper_script: Path
+    hal_file: Path
+    peak_file: Path
+    output_dir: Path
+    temp_dir: Path
+    job_name: str = "halper_pancreas"
+
+    def __post_init__(self):
+        if not self.halper_script.exists():
+            raise FileNotFoundError(f"HALPER script not found: {self.halper_script}")
+        if not self.hal_file.exists():
+            raise FileNotFoundError(f"HAL file not found: {self.hal_file}")
+        if not self.peak_file.exists():
+            raise FileNotFoundError(f"Peak file not found: {self.peak_file}")
+        if self.peak_file.suffix != ".narrowPeak":
+            raise ValueError(f"Peak file must be .narrowPeak: {self.peak_file}")
+
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.temp_dir.mkdir(parents=True, exist_ok=True)
 
 
-# First load config and check file path. 
-def load_and_validate_config():
-    script_dir = Path(__file__).resolve().parent
-    config_path = script_dir / "config.yaml"
-
+def load_config(config_path: Path) -> HalperOneRunConfig:
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 
+    return HalperOneRunConfig(
+        source_species=config["species_1"],
+        target_species=config["species_2"],
+        organ=config["organ"],
+        halper_script=Path(config["halper_script"]),
+        hal_file=Path(config["hal_file"]),
+        peak_file=Path(config["species_1_peak_file"]),
+        output_dir=Path(config["halper_output_dir"]),
+        temp_dir=Path(config["temp_dir"]),
+        job_name=config.get("job_name", "halper_pancreas")
+    )
+
+
+def generate_slurm_script(config: HalperOneRunConfig) -> Path:
+    job_script = config.temp_dir / f"{config.job_name}.job"
+    out_log = config.output_dir / f"{config.job_name}.out.txt"
+    err_log = config.output_dir / f"{config.job_name}.err.txt"
+
+    script_text = f"""#!/bin/bash
+#SBATCH -p RM-shared
+#SBATCH -t 12:00:00
+#SBATCH --ntasks-per-node=4
+#SBATCH --job-name={config.job_name}
+#SBATCH --output={out_log}
+#SBATCH --error={err_log}
+
+set -euo pipefail
+
+export PATH=/ocean/projects/bio230007p/jji5/tools/hal/bin:$PATH
+export PATH=$HOME/bin:$PATH
+
+echo "Running HALPER"
+echo "Source species: {config.source_species}"
+echo "Target species: {config.target_species}"
+echo "Organ: {config.organ}"
+echo "Peak file: {config.peak_file}"
+echo "HAL file: {config.hal_file}"
+echo "Output dir: {config.output_dir}"
+
+which halLiftover || true
+which python || true
+
+bash {config.halper_script} \\
+  -b {config.peak_file} \\
+  -o {config.output_dir} \\
+  -s {config.source_species} \\
+  -t {config.target_species} \\
+  -c {config.hal_file}
+
+echo "HALPER job finished"
+"""
+
+    with open(job_script, "w") as f:
+        f.write(script_text)
+
+    job_script.chmod(0o755)
+    return job_script
+
+
+def submit_job(job_script: Path) -> None:
+    result = subprocess.run(
+        ["sbatch", str(job_script)],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True
+    )
+    print(result.stdout)
+    if result.stderr:
+        print(result.stderr)
+
+
+def main():
+    script_dir = Path(__file__).resolve().parent
+    config_path = script_dir / "config.yaml"
+
+    config = load_config(config_path)
     print("Config loaded successfully.")
 
-    paths_to_check = [
-        ("halper_script", config["halper_script"]),
-        ("hal_file", config["hal_file"]),
-        ("species_1_peak_file", config["species_1_peak_file"]),
-        ("species_2_peak_file", config["species_2_peak_file"]),
-    ]
+    job_script = generate_slurm_script(config)
+    print(f"Generated SLURM script: {job_script}")
 
-    for label, p in paths_to_check:
-        path = Path(p)
-        print(f"{label}: exists={path.exists()} | {path}")
-        if not path.exists():
-            raise FileNotFoundError(f"Missing required path for {label}: {path}")
+    submit_job(job_script)
 
-    output_dir = Path(config["halper_output_dir"])
-    output_dir.mkdir(parents=True, exist_ok=True)
-    print(f"Output dir ready: {output_dir}")
-
-    return config
 
 if __name__ == "__main__":
-    config = load_and_validate_config()
-
-
-def build_halper_command(config):
-    cmd = [
-        "bash",
-        config["halper_script"],
-        "-b", config["species_1_peak_file"],
-        "-o", config["halper_output_dir"],
-        "-s", config["species_1"],
-        "-t", config["species_2"],
-        "-c", config["hal_file"],
-    ]
-    return cmd
-
-
-def run_halper(config):
-    env = os.environ.copy()
-
-    hal_bin = "/ocean/projects/bio230007p/jji5/tools/hal/bin"
-    user_bin = os.path.expanduser("~/bin")
-
-    env["PATH"] = f"{user_bin}:{hal_bin}:{env['PATH']}"
-
-    cmd = build_halper_command(config)
-
-    print("\nRunning HALPER:")
-    print(" ".join(cmd))
-    print("PATH =", env["PATH"])
-
-    subprocess.run(cmd, check=True, env=env)
-
-if __name__ == "__main__":
-    config = load_and_validate_config()
-    run_halper(config)
+    main()
