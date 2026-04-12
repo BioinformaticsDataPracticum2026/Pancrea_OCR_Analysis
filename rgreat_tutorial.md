@@ -34,27 +34,16 @@ If no error appears, the installation is successful.
 
 ## ⚠️ Notes
 
-- Always activate the conda environment before launching R  
-- Installation may take several minutes  
-- Some dependencies may be required on Bridges-2  
+- Always activate your conda environment before launching R
+- Some dependencies may be required on Bridges-2
 
 ---
 
 ## 🧬 Usage in this project
 
-- Functional enrichment analysis of ATAC-seq peaks  
+- Functional enrichment analysis of ATAC-seq peaks 
 - Interpretation of shared vs species-specific OCRs  
-- Linking regulatory regions to biological processes  
-
----
-
-## 🛠️ Troubleshooting
-
-| Issue | Possible Fix |
-|------|-------------|
-| Installation fails | Reinstall BiocManager |
-| Missing libraries | Check conda environment |
-| R crashes | Restart R session |
+- Linking regulatory regions to biological pathways  
 
 ---
 
