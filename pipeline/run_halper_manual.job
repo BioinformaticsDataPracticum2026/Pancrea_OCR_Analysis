@@ -1,0 +1,95 @@
+#!/bin/bash
+#SBATCH -p RM-shared
+#SBATCH -t 12:00:00
+#SBATCH --nodes=1sa
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --job-name=halper_human_pancreas_to_mouse
+#SBATCH --output=/ocean/projects/bio230007p/jji5/output/halper/halper_human_pancreas_to_mouse.out.txt
+#SBATCH --error=/ocean/projects/bio230007p/jji5/output/halper/halper_human_pancreas_to_mouse.err.txt
+
+set -euo pipefail
+
+# -----------------------------
+# Paths
+# -----------------------------
+HAL_BIN="/ocean/projects/bio230007p/jji5/tools/hal/bin"
+HALPER_DIR="/ocean/projects/bio230007p/jji5/tools/halLiftover-postprocessing"
+HAL_FILE="/ocean/projects/bio230007p/jji5/data/Alignments/10plusway-master.hal"
+
+INPUT_NARROWPEAK="/ocean/projects/bio230007p/jji5/data/Human_Pancreas_ATAC/peak/idr_reproducibility/idr.optimal_peak.narrowPeak"
+OUT_DIR="/ocean/projects/bio230007p/jji5/output/halper_manual"
+
+SOURCE_SPECIES="Human"
+TARGET_SPECIES="Mouse"
+
+mkdir -p "${OUT_DIR}"
+
+export PATH="${HAL_BIN}:$HOME/bin:$PATH"
+export PYTHONPATH="${HALPER_DIR}:${PYTHONPATH:-}"
+
+echo "Starting HALPER manual pipeline"
+echo "Input: ${INPUT_NARROWPEAK}"
+echo "HAL: ${HAL_FILE}"
+echo "Output: ${OUT_DIR}"
+
+which halLiftover
+which python
+
+# -----------------------------
+# File names
+# -----------------------------
+BASE="human_pancreas"
+BED4="${OUT_DIR}/${BASE}.bed"
+SUMMITS="${OUT_DIR}/${BASE}_summits.bed"
+LIFTED_PEAKS="${OUT_DIR}/${BASE}_to_mouse_halLift.bed"
+LIFTED_SUMMITS="${OUT_DIR}/${BASE}_summits_to_mouse_halLift.bed"
+FINAL_OUT="${OUT_DIR}/${BASE}_to_mouse_HALPER.bed"
+
+# -----------------------------
+# Step 1: make 4-column BED
+# -----------------------------
+awk 'BEGIN{OFS="\t"}{name=$4; if(name==".") name="peak_"NR; print $1,$2,$3,name}' \
+    "${INPUT_NARROWPEAK}" > "${BED4}"
+
+# -----------------------------
+# Step 2: make summit BED
+# -----------------------------
+awk 'BEGIN{OFS="\t"}{name=$4; if(name==".") name="peak_"NR; print $1,$2+$10,$2+$10+1,name}' \
+    "${INPUT_NARROWPEAK}" > "${SUMMITS}"
+
+# -----------------------------
+# Step 3: liftover peaks
+# -----------------------------
+halLiftover --bedType 4 \
+    "${HAL_FILE}" \
+    "${SOURCE_SPECIES}" \
+    "${BED4}" \
+    "${TARGET_SPECIES}" \
+    "${LIFTED_PEAKS}"
+
+# -----------------------------
+# Step 4: liftover summits
+# -----------------------------
+halLiftover \
+    "${HAL_FILE}" \
+    "${SOURCE_SPECIES}" \
+    "${SUMMITS}" \
+    "${TARGET_SPECIES}" \
+    "${LIFTED_SUMMITS}"
+
+# -----------------------------
+# Step 5: HALPER
+# -----------------------------
+python "${HALPER_DIR}/orthologFind.py" \
+    -max_len 1000 \
+    -min_len 50 \
+    -protect_dist 5 \
+    -qFile "${BED4}" \
+    -tFile "${LIFTED_PEAKS}" \
+    -sFile "${LIFTED_SUMMITS}" \
+    -oFile "${FINAL_OUT}" \
+    -mult_keepone
+
+echo "Pipeline completed successfully"
+echo "Final output: ${FINAL_OUT}"
