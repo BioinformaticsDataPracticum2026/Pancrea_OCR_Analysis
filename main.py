@@ -14,6 +14,7 @@ sys.path.append(str(project_root / "pipeline"))
 
 import pipeline.halper as halper
 import pipeline.bed_genome as bed_genome
+import pipeline.bed_promoter_enhancer as bed_promoter_enhancer
 import pipeline.homer as homer
 
 def main():
@@ -32,8 +33,10 @@ def main():
 
     if "halper" in steps:
         halper.main()
-    if "bed" in steps:
+    if "bed_g" in steps:
         bed_genome.main()
+    if "bed_pe" in steps:
+        bed_promoter_enhancer.main()
     if "homer" in steps:
         homer.main()
 
