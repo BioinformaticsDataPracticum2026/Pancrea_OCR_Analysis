@@ -34,6 +34,24 @@ bed_pe_output_dir_mth: "/ocean/projects/bio230007p/jji5/output/bed_promoter_enha
 promoter_threshold: 2000
 temp_dir: "/ocean/projects/bio230007p/jji5/output/temp"
 
+# rGreat:
+run_mode: shared
+rgreat:
+  comparisons:
+    HtM:
+      genome_build: mm10
+      shared_file: /ocean/projects/bio230007p/jji5/output/bed/HtM/shared_ocrs.bed
+      not_open_file: /ocean/projects/bio230007p/jji5/output/bed/HtM/mapped_not_open_in_mouse.bed
+      background_file: /ocean/projects/bio230007p/jji5/output/bed/HtM/mapped_mouse_halper.bed
+      base_outdir: /ocean/projects/bio230007p/jji5/results/rGreat/HtM
+
+    MtH:
+      genome_build: hg38
+      shared_file: /ocean/projects/bio230007p/jji5/output/bed/MtH/shared_ocrs.bed
+      not_open_file: /ocean/projects/bio230007p/jji5/output/bed/MtH/mapped_not_open_in_human.bed
+      background_file: /ocean/projects/bio230007p/jji5/output/bed/MtH/mapped_human_halper.bed
+      base_outdir: /ocean/projects/bio230007p/jji5/results/rGreat/MtH
+
 # HOMER inputs
 mouse_enhancer_file: "/ocean/projects/bio230007p/jji5/output/bed_promoter_enhancer/HtM/mouse_enhancer_ocrs.bed"
 human_enhancer_file: "/ocean/projects/bio230007p/jji5/output/bed_promoter_enhancer/MtH/human_enhancer_ocrs.bed"

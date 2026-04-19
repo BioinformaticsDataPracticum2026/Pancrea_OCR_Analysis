@@ -16,6 +16,7 @@ import pipeline.halper as halper
 import pipeline.bed_genome as bed_genome
 import pipeline.bed_promoter_enhancer as bed_promoter_enhancer
 import pipeline.homer as homer
+import pipeline.r_scripts.rGreat as rGreat
 
 def main():
     parser = argparse.ArgumentParser()
