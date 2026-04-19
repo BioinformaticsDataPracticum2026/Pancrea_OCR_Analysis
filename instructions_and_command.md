@@ -1,7 +1,7 @@
 ### Access the Bridges-2 server
 
 ```bash
-    ssh jji5@bridges2.psc.edu
+    ssh yourusername@bridges2.psc.edu
 ```
 
 Then enter password for your bridges-2 account. You won't be able to see the password when you type. 
