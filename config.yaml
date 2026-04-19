@@ -1,0 +1,72 @@
+species_1: "Human"
+species_2: "Mouse"
+organ: "Pancreas"
+
+# For running halper
+
+halper_repo: "/ocean/projects/bio230007p/jji5/tools/halLiftover-postprocessing"
+hal_file: "/ocean/projects/bio230007p/jji5/data/Alignments/10plusway-master.hal"
+species_1_peak_file: "/ocean/projects/bio230007p/jji5/data/Human_Pancreas_ATAC/peak/idr_reproducibility/idr.optimal_peak.narrowPeak"
+species_2_peak_file: "/ocean/projects/bio230007p/jji5/data/Mouse_Pancreas_ATAC/peak/idr_reproducibility/idr.optimal_peak.narrowPeak"
+halper_output_dir_htm: "/ocean/projects/bio230007p/jji5/output/halper/HtM"
+halper_output_dir_mth: "/ocean/projects/bio230007p/jji5/output/halper/MtH"
+temp_dir: "/ocean/projects/bio230007p/jji5/output/temp"
+conda_env: "/ocean/projects/bio230007p/jji5/conda_envs/ATAC_env"
+
+# For running bed
+mapped_htm_file: "/ocean/projects/bio230007p/jji5/output/halper/HtM/idr.optimal_peak.HumanToMouse.HALPER.narrowPeak"
+mouse_peak_file: "/ocean/projects/bio230007p/jji5/data/Mouse_Pancreas_ATAC/peak/idr_reproducibility/idr.optimal_peak.narrowPeak"
+
+mapped_mth_file: "/ocean/projects/bio230007p/jji5/output/halper/MtH/idr.optimal_peak.MouseToHuman.HALPER.narrowPeak"
+human_peak_file: "/ocean/projects/bio230007p/jji5/data/Human_Pancreas_ATAC/peak/idr_reproducibility/idr.optimal_peak.narrowPeak"
+
+bed_output_dir_htm: "/ocean/projects/bio230007p/jji5/output/bed/HtM"
+bed_output_dir_mth: "/ocean/projects/bio230007p/jji5/output/bed/MtH"
+
+temp_dir: "/ocean/projects/bio230007p/jji5/output/temp"
+
+mouse_tss_file: "/ocean/projects/bio230007p/jji5/data/MouseGenomeInfo/gencode.vM15.annotation.protTranscript.geneNames_TSSWithStrand_sorted.bed"
+human_tss_file: "/ocean/projects/bio230007p/jji5/data/HumanGenomeInfo/gencode.v27.annotation.protTranscript.TSSsWithStrand_sorted.bed"
+
+bed_pe_output_dir_htm: "/ocean/projects/bio230007p/jji5/output/bed_promoter_enhancer/HtM"
+bed_pe_output_dir_mth: "/ocean/projects/bio230007p/jji5/output/bed_promoter_enhancer/MtH"
+
+promoter_threshold: 2000
+temp_dir: "/ocean/projects/bio230007p/jji5/output/temp"
+
+# rGreat:
+run_mode: shared
+rgreat:
+  comparisons:
+    HtM:
+      genome_build: mm10
+      shared_file: /ocean/projects/bio230007p/jji5/output/bed/HtM/shared_ocrs.bed
+      not_open_file: /ocean/projects/bio230007p/jji5/output/bed/HtM/mapped_not_open_in_mouse.bed
+      background_file: /ocean/projects/bio230007p/jji5/output/bed/HtM/mapped_mouse_halper.bed
+      base_outdir: /ocean/projects/bio230007p/jji5/results/rGreat/HtM
+
+    MtH:
+      genome_build: hg38
+      shared_file: /ocean/projects/bio230007p/jji5/output/bed/MtH/shared_ocrs.bed
+      not_open_file: /ocean/projects/bio230007p/jji5/output/bed/MtH/mapped_not_open_in_human.bed
+      background_file: /ocean/projects/bio230007p/jji5/output/bed/MtH/mapped_human_halper.bed
+      base_outdir: /ocean/projects/bio230007p/jji5/results/rGreat/MtH
+
+# HOMER inputs
+mouse_enhancer_file: "/ocean/projects/bio230007p/jji5/output/bed_promoter_enhancer/HtM/mouse_enhancer_ocrs.bed"
+human_enhancer_file: "/ocean/projects/bio230007p/jji5/output/bed_promoter_enhancer/MtH/human_enhancer_ocrs.bed"
+
+mouse_promoter_file: "/ocean/projects/bio230007p/jji5/output/bed_promoter_enhancer/HtM/mouse_promoter_ocrs.bed"
+human_promoter_file: "/ocean/projects/bio230007p/jji5/output/bed_promoter_enhancer/MtH/human_promoter_ocrs.bed"
+
+shared_enhancer_htm_file: "/ocean/projects/bio230007p/jji5/output/bed_promoter_enhancer/HtM/shared_enhancer_ocrs.bed"
+shared_enhancer_mth_file: "/ocean/projects/bio230007p/jji5/output/bed_promoter_enhancer/MtH/shared_enhancer_ocrs.bed"
+
+specific_enhancer_htm_file: "/ocean/projects/bio230007p/jji5/output/bed_promoter_enhancer/HtM/specific_enhancer_ocrs.bed"
+specific_enhancer_mth_file: "/ocean/projects/bio230007p/jji5/output/bed_promoter_enhancer/MtH/specific_enhancer_ocrs.bed"
+
+mouse_genome_fasta: "/ocean/projects/bio230007p/jji5/data/MouseGenomeInfo/mm10.fa"
+human_genome_fasta: "/ocean/projects/bio230007p/jji5/data/HumanGenomeInfo/hg38.fa"
+
+homer_output_dir: "/ocean/projects/bio230007p/jji5/output/homer"
+temp_dir: "/ocean/projects/bio230007p/jji5/output/temp"
