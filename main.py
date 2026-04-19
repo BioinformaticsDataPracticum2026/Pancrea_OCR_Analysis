@@ -1,7 +1,7 @@
 """
 run part or all of the pipeline:
     python3 main.py --run halper
-    python3 main.py --run bed homer
+    python3 main.py --run bed_g homer
     python3 main.py --run all
 """
 

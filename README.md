@@ -1,8 +1,9 @@
 # ATAC-seq Project README
 
-## Overview
-This project analyzes ATAC-seq open chromatin regions (OCRs) across multiple species to identify conserved and species-specific regulatory elements. The workflow focuses on:
 
+
+## Overview
+This project analyzes ATAC-seq open chromatin regions (OCRs) across two species to identify conserved and species-specific regulatory elements. The workflow focuses on:
 - processing mapped OCR peak files for each species
 - separating OCRs into likely promoter-like and enhancer-like regions
 - comparing OCR classes across species to define shared and species-specific elements
@@ -12,165 +13,147 @@ The overall goal is to assess how chromatin accessibility and regulatory archite
 
 ---
 
-## Project goals
+## Dependencies:
+- Python version 3.6 or 3.7 (https://www.python.org/downloads/release/python-371/)
+- Python libraries `matplotlib` and `numpy`
+- R version >= 4.0.0 (https://www.r-project.org/)
+- Conda environment
 
-1. Identify OCRs from ATAC-seq peak sets for each species.
-2. Classify OCRs into likely promoters and likely enhancers.
-3. Compare promoter-like and enhancer-like OCRs across species.
-4. Define shared versus species-specific OCRs within each regulatory class.
-5. Perform motif enrichment analysis to identify sequence patterns that may underlie regulatory conservation or divergence.
+## Prerequisits and Installation:
+This project is being developed on Bridges-2, a Linux HPC cluster. Therefre, it is best that the pipeline is ran on a cluster with similar level of computational power and settings.
 
----
+If the software is not installed on cluster or on the device you are using to run this pipeline, install them following the instructions below:
 
-## Input data
+- Halper and HalLiftover: https://github.com/ComparativeGenomicsToolkit/hal
+- Bedtools: https://bedtools.readthedocs.io/en/latest/content/installation.html
+- rGreat: https://github.com/jokergoo/rgreat
+- Homer: http://homer.ucsd.edu/homer/
 
-The main inputs are mapped OCR peak files for each species.
 
-Typical inputs include:
+## How to Run the pipeline:
+There are multiple parts in this pipeline. They can be ran all at once or separately. First navigate to the project's top directory from terminal.
+```Bash
+cd path_to_project_top_dir
+```
+To run all steps at once:
+```Bash
+python3 main.py --run all
+```
 
-- peak BED files for each species
-- mapped/orthologous OCR coordinates across species
-- genome annotation files for assigning OCRs relative to transcription start sites (TSS)
-- reference genome files required for downstream motif analysis
+However, if you wish to run steps separately, the first step is still mandatory for the downstream analysis:
+```Bash
+python3 main.py --run halper
+```
 
-If applicable, peak sets were selected from the `idr.optimal` output rather than more conservative peak sets in order to balance reproducibility with sensitivity. This is often appropriate when the downstream analysis depends on capturing a comprehensive set of biologically meaningful accessible regions, especially for comparative analyses where overly conservative filtering may remove true OCRs that are weaker but reproducible.
+For other functions, replace the keyword after `--run` with the following:
 
----
+| Keyword | Function|
+| -------- | -------- |
+| halper | Run halLiftover+halper to map peaks from source to target species in both direction|
+| bed_pe   | Run bed pipeline to separate peaks into likely enhancers and likely promoters |
+| bed_g | Run bed pipeline to find OCRs that are species specific or shared |
+| homer | Run homer for finding sequence pattern |
+
+
+
 
 ## Workflow summary
 
-### 1. Peak preparation
-For each species, begin with the mapped OCR peak file. These peaks represent candidate open chromatin regions identified from ATAC-seq data and mapped into a comparable coordinate framework for cross-species analysis.
+### 1\. Peak preparation using `HalLiftover` and `Halper`
 
-### 2. Divide OCRs into likely promoter-like and enhancer-like regions
-OCRs are classified based on their distance to annotated transcription start sites.
+#### Input: 
+- `idr.optimal_peak.narrowPeak` or `idr.conservative_peak`.narrowPeak from both human and mouse. These are all the 
 
-General rationale:
+#### What the pipeline does:
 
-- **promoter-like OCRs** are located near TSSs
-- **enhancer-like OCRs** are located farther from TSSs
+- The pipeline first maps reproducible ATAC-seq peaks between species using `halLiftover` and `HALPER`. Starting from the `idr.optimal_peak.narrowPeak` files, peaks are lifted over in both directions: from human to mouse and from mouse to human.
 
-This distinction is useful because promoters and enhancers differ in regulatory role, sequence composition, and degree of evolutionary conservation.
+- `halLiftover` uses a multiple-species genome alignment in HAL format to project each peak’s genomic coordinates from one species onto the other genome. Because raw liftover can produce fragmented or partial mappings, `HALPER` is then used to post-process these lifted regions, reconstructing orthologous regulatory elements in a more consistent and interpretable way.
 
-### 3. Compare promoter-like and enhancer-like OCRs across species
-After dividing mapped OCRs into promoter-like and enhancer-like sets in each species, overlap analysis is performed again within each class to determine:
+- Running the mapping in both directions helps reduce directional bias and provides a more complete set of orthologous open chromatin regions for downstream comparison.
 
-- promoter-like OCRs shared across species
-- promoter-like OCRs specific to a given species
-- enhancer-like OCRs shared across species
-- enhancer-like OCRs specific to a given species
+#### Output:
 
-Shared OCRs are identified by intersecting OCR sets across species.
-Species-specific OCRs within a class are defined by subtracting shared OCRs from the mapped OCRs for that class.
+- Mapped OCR peak sets in the other species’ genome coordinates, including human-to-mouse and mouse-to-human orthologous peak regions, ready for overlap and conservation analysis.
 
-This allows direct comparison of conservation patterns between promoter-associated and enhancer-associated accessible regions.
+### 2\. Identify shared and species-specific mapped peaks using `BEDTools`
 
-### 4. Motif enrichment / sequence pattern analysis
-After identifying enhancer and promoter sets, motif enrichment analysis is performed with HOMER to determine whether the observed sequence patterns are enriched beyond chance expectation.
+#### Input:
 
-HOMER is run on the following peak sets:
+- Mapped OCR peak sets `idr.optimal_peak.SourcetoTarget.HALPER.narrowPeak` generated from step 1. There should be one for Human to Mouse mapping and one from the other direction.
 
-1. enhancers for each species
-2. promoters for each species
-3. enhancers shared across species
-4. enhancers specific to each species
+#### What the pipline does:
 
-These analyses help identify transcription factor binding motifs and other enriched sequence patterns that may explain conserved regulatory programs or species-specific regulatory evolution.
+- The pipeline uses the `bed_intersect` function from `BEDTools` to compare the mapped peak sets and determine which OCRs are shared between species and which are species-specific. Peaks that overlap between the compared mapped sets are classified as shared peaks. Peaks that do not overlap a corresponding region in the other species are classified as species-specific peaks. The `-v` flag is used to find species specific peaks, and the `-u` flag is used to find overlapping but unique peeaks.
 
----
+#### Output:
 
-## Suggested directory structure
+If ran in both direction, there should be a set of these output for each direction:
+- shared_ocrs.bed
+- mapped_not_open_in_target.bed
 
-```text
-project/
-├── data/
-│   ├── peaks/
-│   ├── mapped_ocr/
-│   ├── annotations/
-│   └── genomes/
-├── results/
-│   ├── promoter_enhancer_split/
-│   ├── shared_vs_specific/
-│   ├── homer/
-│   └── figures/
-├── scripts/
-│   ├── classify_ocr/
-│   ├── intersect/
-│   ├── subtract/
-│   └── motif_analysis/
-└── README.md
-```
+For example if we run Human (source) to Mouse (target), we will get one bed file for shared ocr, and one for Human specific peaks that are not open in mouse.
+
+
+### 3\. Functional annotation of OCR sets using rGREAT
+#### Input: 
+
+For both directions from source_species to target_species:
+- shared OCRs: `shared_ocrs.bed`
+- Source Species Specific OCRs: `mapped_not_open_in_target_species.bed`
+- background information: `mapped_source_species_halper.bed`
+
+#### What the pipeline does:
+The rGreat pipeline will analyze two sets of regions
+- shared OCRs: conserved accessible regions between species
+- species specific OCRs: regions mapped to target_species but not accessible in source_species.
+
+The pipeline look at these regions and analyze their biological functions. 
+
+#### Output:
+For shared region: `shared_GO_BP.tsv` and `shared_great_object.rds`
+For specific region: `specific_GO_BP.tsv` and `specific_great_object.rds`
+The pipeline will also take the tsv file and plot bubble plot for the top genes. 
 
 ---
 
-## Example analysis logic
+### 4\. Separate Peaks into likely-Enhancer or likely-Promoters
+#### Input:
+This step comes right after running halper, so we need two files:
+mapped peak: `idr.optimal_peak.SourceToTarget.HALPER.narrowPeak`
+original peak of Target species: `idr.optimal_peak.narrowPeak`
 
-### Promoter/enhancer classification
-A typical strategy is to define promoter-like OCRs as peaks within a specified distance of a TSS, and enhancer-like OCRs as peaks outside that window. The exact threshold should be reported in the Methods section and justified with literature when possible.
+You also need to define a promoter distance threshold (`default = 2000bp`)
 
-### Shared versus species-specific OCRs
-For each OCR class:
+To distinguish promoter from enhancer in species specific peaks, we also need information about the locations of Transcription Start Sties for that particular species.
+- for human specific: `gencode.v27.annotation.protTranscript.TSSsWithStrand_sorted.bed`
+- for mice specific: `gencode.vM15.annotation.protTranscript.geneNames_TSSWithStrand_sorted.bed`
 
-- use intersection across species to define shared regions
-- subtract shared regions from mapped OCRs to obtain species-specific regions
+#### What the pipeline does:
+The pipeline first use `bedtools_closest ` to classify peaks into likely promoters and likely enhancer based on the distance threshold.
 
-### Motif analysis
-For each peak set of interest:
+After dividing the mapped OCRs into promoter-like and enhancer-like sets in each species, it uses the `-u` flag in `bedtools_intersect` to compare the corresponding classes across species and determine which promoter-like and enhancer-like OCRs were shared. 
 
-- provide HOMER with the target BED file
-- define an appropriate background set
-- compare motif enrichment across shared and species-specific regulatory elements
+Finally, to identify species_specific OCRs within each class, it uses the `-v` flag in `bedtools_intersect` to subtract the shared OCRs from the full mapped OCR set for that class. 
 
----
+#### Output:
+For both SourceToTarget direction, the result will look different but the outputted files are the same:
+- `bed_pe_source_pancrea_to_target.out.txt` contains summary of the result.
+- `species_enhancer_ocrs.bed` and `species_promoter_ocrs.bed`
+- `species_specific_enhancer_ocrs.bed` and `species_specific_promoter_ocrs.bed`
+- `shared_enhancer_ocrs.bed` and `shared_promoter_ocrs.bed`
 
-## Interpretation framework
+### 5\. Finding frequent sequence pattern:
+#### Input:
+- all or part of the output files from step 4, depending on your analysis goal. 
+- A FASTA genome reference file: Human (hg18, hg19, hg38), Mouse (mm8, mm9, mm10)
 
-This project is built on the expectation that promoter-like OCRs may be more conserved across species than enhancer-like OCRs, because promoters are often more tightly constrained by gene regulation requirements. Enhancer-like OCRs may show more lineage- or species-specific accessibility, reflecting regulatory innovation or adaptation.
+#### What the piprline does:
+Using the `findMotifsGenome.pl` function from Homer, identifies enriched de novo and known DNA motifs within genomic regions (BED files). It extracts sequences from a specified genome, accounts for background sequence composition (GC content), and produces HTML reports of motif enrichment. 
 
-Motif enrichment results can then be used to infer:
+#### Output:
+- One `.html` files for each of the input. 
 
-- which regulatory programs are broadly conserved
-- which transcription factor families may drive species-specific accessibility patterns
-- whether shared OCRs are associated with core regulatory functions
-
----
-
-## Software and tools
-
-Common tools used in this workflow may include:
-
-- BEDTools for genomic intersections and subtraction
-- HOMER for motif enrichment analysis
-- genome annotation utilities for assigning OCRs relative to TSS
-- standard shell, Python, or R scripts for workflow organization and plotting
-
----
-
-## Notes and assumptions
-
-- This README is a project-level draft based on prior discussion context and may need to be adjusted to match the exact scripts, file names, thresholds, and species used in the actual project.
-- The exact promoter distance threshold, species list, reference genomes, and HOMER parameters should be filled in explicitly.
-- If you used `idr.optimal` peak sets, document that choice clearly in the Methods section together with the reason for preferring it over a conservative peak set.
-
----
-
-## Items to fill in
-
-Before finalizing this README, replace the placeholders below with project-specific details:
-
-- species analyzed:
-- genome builds used:
-- promoter distance threshold:
-- exact peak file names:
-- exact overlap criteria:
-- HOMER command or parameter settings:
-- script names and execution order:
-- output figure/table descriptions:
-
----
-
-## Contact / maintainer
-
-Add project owner, lab, and contact information here.
-
+## To Cite this repository
+Ji A, Fang K, Huang Z. Pancrea_OCR_Analysis. GitHub repository, branch SF. 2026. Available at: https://github.com/BioinformaticsDataPracticum2026/Pancrea_OCR_Analysis
 
