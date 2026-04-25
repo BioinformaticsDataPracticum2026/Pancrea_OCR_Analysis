@@ -50,7 +50,7 @@ There are two types of folders in this project:
 
 ## Required Files and Folders
 
-The following files and folders should exist before running the pipeline.
+The following files and folders should exist before running the pipeline. Check if these files exist after cloning the repo and modify them if necessary
 
 ### Code and Configuration
 
@@ -176,7 +176,7 @@ The `config.yaml` file should define `project_root` and then use relative paths 
 Example:
 
 ```yaml
-project_root: "/ocean/projects/bio230007p/jji5"
+project_root: "/ocean/projects/bio230007p/project_folder"
 
 species_1: "Human"
 species_2: "Mouse"
