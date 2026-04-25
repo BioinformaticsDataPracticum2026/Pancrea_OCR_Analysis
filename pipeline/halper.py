@@ -1,54 +1,29 @@
 from pathlib import Path
-import subprocess
 import textwrap
-import yaml
-
-# run with:
-# python3 /ocean/projects/bio230007p/jji5/pipeline/halper.py
-
-def load_config():
-    project_root = Path(__file__).resolve().parents[1]
-    config_path = project_root / "config.yaml"
-
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
-
-    required_paths = [
-        ("halper_repo", Path(config["halper_repo"])),
-        ("hal_file", Path(config["hal_file"])),
-        ("species_1_peak_file", Path(config["species_1_peak_file"])),
-        ("species_2_peak_file", Path(config["species_2_peak_file"])),
-    ]
-    # Check if files exist
-    for label, path in required_paths:
-        if not path.exists():
-            raise FileNotFoundError(f"{label} not found: {path}")
-    # Check if file format is correct (must be .narrowPeak)
-    for peak_key in ["species_1_peak_file", "species_2_peak_file"]:
-        peak_path = Path(config[peak_key])
-        if peak_path.suffix != ".narrowPeak":
-            raise ValueError(f"{peak_key} must be a .narrowPeak file: {peak_path}")
-
-    Path(config["halper_output_dir_htm"]).mkdir(parents=True, exist_ok=True)
-    Path(config["halper_output_dir_mth"]).mkdir(parents=True, exist_ok=True)
-    Path(config["temp_dir"]).mkdir(parents=True, exist_ok=True)
-
-    ortholog_script = Path(config["halper_repo"]) / "orthologFind.py"
-    if not ortholog_script.exists():
-        raise FileNotFoundError(f"orthologFind.py not found: {ortholog_script}")
-
-    return config
+from utils import load_config, submit_job
 
 # generates job bash job scripts
 def make_job_script(config, source_species, target_species, peak_file, job_name, output_dir):
     """
-    Input: config file path, source species name, target species name, peak file of source species, job name (customize), output dir.
-    Output: Not that important (peak bed, summit bed, lifted peak and summit from source to target species);
-            Important (SourceToTarget.HALPER.narrowPeak)
+    Final useful outputs:
+        1. *.HALPER.narrowPeak
+        2. *.HALPER.narrowPeak.failed
+        3. *.HALPER.narrowPeak.png
+        4. *.HALPER.narrowPeak-peak.png, if generated
+
+    Temporary files used internally:
+        - converted peak BED
+        - summit BED
+        - lifted peak BED
+        - lifted summit BED
+    These are deleted after the run.
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    temp_dir = Path(config["temp_dir"])
+
+    temp_dir = Path(config["halper_temp_dir"])
+    temp_dir.mkdir(parents=True, exist_ok=True)
+
     hal_file = Path(config["hal_file"])
     halper_repo = Path(config["halper_repo"])
     ortholog_script = halper_repo / "orthologFind.py"
@@ -57,14 +32,25 @@ def make_job_script(config, source_species, target_species, peak_file, job_name,
     peak_base = peak_file.stem
 
     job_script = temp_dir / f"{job_name}.job"
-    out_log = output_dir / f"{job_name}.out.txt"
-    err_log = output_dir / f"{job_name}.err.txt"
 
-    peak_bed = output_dir / f"{peak_base}.{source_species}To{target_species}.bed"
-    summit_bed = output_dir / f"{peak_base}.{source_species}To{target_species}.summits.bed"
-    lifted_peak_bed = output_dir / f"{peak_base}.{source_species}To{target_species}.halLiftover.tFile.bed"
-    lifted_summit_bed = output_dir / f"{peak_base}.{source_species}To{target_species}.halLiftover.sFile.bed"
+    # Keep logs outside the final HALPER output folder
+    log_dir = temp_dir / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    out_log = log_dir / f"{job_name}.out.txt"
+    err_log = log_dir / f"{job_name}.err.txt"
+
+    # Temporary working directory for files needed only during execution
+    work_dir = temp_dir / f"{job_name}_work"
+
+    # Final HALPER output file
     output_file = output_dir / f"{peak_base}.{source_species}To{target_species}.HALPER.narrowPeak"
+
+    # Temporary intermediate files
+    peak_bed = work_dir / f"{peak_base}.{source_species}To{target_species}.bed"
+    summit_bed = work_dir / f"{peak_base}.{source_species}To{target_species}.summits.bed"
+    lifted_peak_bed = work_dir / f"{peak_base}.{source_species}To{target_species}.halLiftover.tFile.bed"
+    lifted_summit_bed = work_dir / f"{peak_base}.{source_species}To{target_species}.halLiftover.sFile.bed"
 
     script_text = textwrap.dedent(f"""\
     #!/bin/bash
@@ -83,18 +69,21 @@ def make_job_script(config, source_species, target_species, peak_file, job_name,
 
     export PATH=/ocean/projects/bio230007p/jji5/tools/hal/bin:$PATH
 
+    mkdir -p {work_dir}
+    mkdir -p {output_dir}
+
     echo "Running HALPER: {source_species} -> {target_species}"
     echo "Peak file: {peak_file}"
     echo "HAL file: {hal_file}"
+    echo "Final output file: {output_file}"
 
-    python -c "import numpy, matplotlib; print('Python deps ok')"
-    which halLiftover || true
-    which python || true
+    which halLiftover
+    which python
 
-    echo "Creating 4-column peak BED"
+    echo "Creating temporary 4-column peak BED"
     awk 'BEGIN{{OFS="\\t"}} {{print $1,$2,$3,"peak_"NR}}' {peak_file} > {peak_bed}
 
-    echo "Creating summit BED"
+    echo "Creating temporary summit BED"
     awk 'BEGIN{{OFS="\\t"}} {{summit=$2+$10; print $1,summit,summit+1,"peak_"NR}}' {peak_file} > {summit_bed}
 
     echo "Running halLiftover on peaks"
@@ -109,6 +98,7 @@ def make_job_script(config, source_species, target_species, peak_file, job_name,
       -min_len 50 \\
       -protect_dist 5 \\
       -mult_keepone \\
+      -narrowPeak \\
       -qFile {peak_bed} \\
       -tFile {lifted_peak_bed} \\
       -sFile {lifted_summit_bed} \\
@@ -119,7 +109,15 @@ def make_job_script(config, source_species, target_species, peak_file, job_name,
         exit 1
     fi
 
+    echo "Cleaning temporary intermediate files"
+    rm -rf {work_dir}
+
     echo "Finished HALPER: {source_species} -> {target_species}"
+    echo "Final files should be:"
+    echo "{output_file}"
+    echo "{output_file}.failed"
+    echo "{output_file}.png"
+    echo "{str(output_file).replace('.narrowPeak', '.narrowPeak-peak.png')}"
     """)
 
     with open(job_script, "w") as f:
@@ -128,21 +126,32 @@ def make_job_script(config, source_species, target_species, peak_file, job_name,
     job_script.chmod(0o755)
     return job_script
 
-# Submit created job to cluster (output/temp)
-def submit_job(job_script):
-    result = subprocess.run(
-        ["sbatch", str(job_script)],
-        check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        universal_newlines=True
-    )
-    print(result.stdout)
-    if result.stderr:
-        print(result.stderr)
 
 def main():
-    config = load_config()
+    config = load_config(
+    path_keys=[
+        "halper_repo",
+        "hal_file",
+        "species_1_peak_file",
+        "species_2_peak_file",
+        "halper_output_dir_htm",
+        "halper_output_dir_mth",
+        "halper_temp_dir",
+        "conda_env",
+    ],
+    required_paths=[
+        "halper_repo",
+        "hal_file",
+        "species_1_peak_file",
+        "species_2_peak_file",
+        "conda_env",
+    ],
+    mkdir_keys=[
+        "halper_output_dir_htm",
+        "halper_output_dir_mth",
+        "halper_temp_dir",
+    ],
+    )
     print("Config loaded successfully.")
 
     human_to_mouse_job = make_job_script(

@@ -1,159 +1,612 @@
 # ATAC-seq Project README
 
-
-
 ## Overview
 This project analyzes ATAC-seq open chromatin regions (OCRs) across two species to identify conserved and species-specific regulatory elements. The workflow focuses on:
-- processing mapped OCR peak files for each species
+
+- mapping OCR peak files between species using halLiftover and HALPER
+- identifying shared and species-specific OCRs with BEDTools
 - separating OCRs into likely promoter-like and enhancer-like regions
-- comparing OCR classes across species to define shared and species-specific elements
-- testing for enriched sequence patterns and transcription factor motifs using HOMER
+- testing for enriched biological processes using rGREAT
+- testing for enriched sequence motifs using HOMER
 
 The overall goal is to assess how chromatin accessibility and regulatory architecture are conserved or diverge across species.
 
 ---
 
 ## Dependencies:
-- Python version 3.6 or 3.7 (https://www.python.org/downloads/release/python-371/)
-- Python libraries `matplotlib` and `numpy`
-- R version >= 4.0.0 (https://www.r-project.org/)
+- Python version 3.6 or 3.7
+- Python libraries: `yaml`, `matplotlib`, `numpy`
+- R version >= 4.0.0
+- R libraries: `rGREAT`, `rtracklayer`, `yaml`, `ggplot2`
 - Conda environment
+- Slurm cluster environment
 
-## Prerequisits and Installation:
-This project is being developed on Bridges-2, a Linux HPC cluster. Therefre, it is best that the pipeline is ran on a cluster with similar level of computational power and settings.
+## Prerequisites and Installation:
+This project is being developed on Bridges-2, a Linux HPC cluster. Therefore, it is best to run the pipeline on a cluster with a similar level of computational power and software environment.
 
-If the software is not installed on cluster or on the device you are using to run this pipeline, install them following the instructions below:
+If the required software is not installed on the cluster or device you are using, install them following the instructions below:
 
-- Halper and HalLiftover: https://github.com/ComparativeGenomicsToolkit/hal
-- Bedtools: https://bedtools.readthedocs.io/en/latest/content/installation.html
-- rGreat: https://github.com/jokergoo/rgreat
-- Homer: http://homer.ucsd.edu/homer/
+- HAL / halLiftover: https://github.com/ComparativeGenomicsToolkit/hal
+- HALPER postprocessing: https://github.com/pfenninglab/halLiftover-postprocessing
+- BEDTools: https://bedtools.readthedocs.io/en/latest/content/installation.html
+- rGREAT: https://github.com/jokergoo/rGREAT
+- HOMER: http://homer.ucsd.edu/homer/
+
+---
+
+# Project Directory Structure and Setup Guide
+
+## Suggested Project Directory Tree
+
+This project should be organized from one top-level project directory, referred to as `project_root` in `config.yaml`.
 
 
-## How to Run the pipeline:
-There are multiple parts in this pipeline. They can be ran all at once or separately. First navigate to the project's top directory from terminal.
-```Bash
+## What the User Needs to Set Up
+
+There are two types of folders in this project:
+
+1. folders and files that must be prepared before running the pipeline
+2. folders that can be created automatically by the scripts
+
+## Required Files and Folders
+
+The following files and folders should exist before running the pipeline.
+
+### Code and Configuration
+
+```text
+config.yaml
+main.py
+README.md
+pipeline/
+tools/
+```
+
+The `pipeline/` folder should contain the Python and R scripts used by the pipeline:
+
+```text
+pipeline/
+├── utils.py
+├── halper.py
+├── bed_genome.py
+├── bed_promoter_enhancer.py
+├── homer.py
+└── r_scripts/
+    ├── rGREAT.R
+    └── plot_rGREAT.R
+```
+
+### HALPER Repository
+
+The HALPER postprocessing repository should be placed here:
+
+```text
+tools/halLiftover-postprocessing/
+```
+
+This should match the following config entry:
+
+```yaml
+halper_repo: "tools/halLiftover-postprocessing"
+```
+
+### Conda Environment
+
+The conda environment should be available here:
+
+```text
+conda_envs/ATAC_env/
+```
+
+This should match the following config entry:
+
+```yaml
+conda_env: "conda_envs/ATAC_env"
+```
+
+### Input Data
+
+The user must provide the main biological input files in the `data/` directory.
+
+Required alignment file:
+
+```text
+data/Alignments/10plusway-master.hal
+```
+
+Required ATAC-seq peak files (both optimal and conserved ok):
+
+```text
+data/Human_Pancreas_ATAC/peak/idr_reproducibility/idr.optimal_peak.narrowPeak
+data/Mouse_Pancreas_ATAC/peak/idr_reproducibility/idr.optimal_peak.narrowPeak
+```
+
+Required genome FASTA files:
+
+```text
+data/HumanGenomeInfo/hg38.fa
+data/MouseGenomeInfo/mm10.fa
+```
+
+Required TSS annotation files:
+
+```text
+data/HumanGenomeInfo/gencode.v27.annotation.protTranscript.TSSsWithStrand_sorted.bed
+data/MouseGenomeInfo/gencode.vM15.annotation.protTranscript.geneNames_TSSWithStrand_sorted.bed
+```
+
+Optional motif database or reference data:
+
+```text
+data/CIS-BP_2.00/
+```
+
+## Output Folders
+
+The `output/` directory stores files generated by the pipeline. Most of these folders can be created automatically by the scripts.
+
+Recommended output structure:
+
+```text
+output/
+├── halper/
+├── bed/
+├── bed_promoter_enhancer/
+├── bed_pe/
+├── homer/
+└── rgreat/
+```
+
+Each pipeline step has its own temporary folder:
+
+```text
+output/halper/temp/
+output/bed/temp/
+output/bed_pe/temp/
+output/homer/temp/
+output/rgreat/temp/
+```
+
+This prevents intermediate files from different scripts from being mixed together.
+
+## Config File Requirements
+
+The `config.yaml` file should define `project_root` and then use relative paths from that project root.
+
+Example:
+
+```yaml
+project_root: "/ocean/projects/bio230007p/jji5"
+
+species_1: "Human"
+species_2: "Mouse"
+organ: "Pancreas"
+
+halper_repo: "tools/halLiftover-postprocessing"
+hal_file: "data/Alignments/10plusway-master.hal"
+
+species_1_peak_file: "data/Human_Pancreas_ATAC/peak/idr_reproducibility/idr.optimal_peak.narrowPeak"
+species_2_peak_file: "data/Mouse_Pancreas_ATAC/peak/idr_reproducibility/idr.optimal_peak.narrowPeak"
+
+halper_output_dir_htm: "output/halper/HtM"
+halper_output_dir_mth: "output/halper/MtH"
+halper_temp_dir: "output/halper/temp"
+
+mapped_htm_file: "output/halper/HtM/idr.optimal_peak.HumanToMouse.HALPER.narrowPeak"
+mapped_mth_file: "output/halper/MtH/idr.optimal_peak.MouseToHuman.HALPER.narrowPeak"
+
+bed_output_dir_htm: "output/bed/HtM"
+bed_output_dir_mth: "output/bed/MtH"
+bed_g_temp_dir: "output/bed/temp"
+
+mouse_tss_file: "data/MouseGenomeInfo/gencode.vM15.annotation.protTranscript.geneNames_TSSWithStrand_sorted.bed"
+human_tss_file: "data/HumanGenomeInfo/gencode.v27.annotation.protTranscript.TSSsWithStrand_sorted.bed"
+
+bed_pe_output_dir_htm: "output/bed_promoter_enhancer/HtM"
+bed_pe_output_dir_mth: "output/bed_promoter_enhancer/MtH"
+bed_pe_temp_dir: "output/bed_pe/temp"
+
+promoter_threshold: 2000
+
+homer_output_dir: "output/homer"
+homer_temp_dir: "output/homer/temp"
+
+rgreat_output_dir: "output/rgreat"
+rgreat_temp_dir: "output/rgreat/temp"
+
+conda_env: "conda_envs/ATAC_env"
+```
+
+## Minimum Setup Checklist
+
+Before running the pipeline, confirm that the following exist:
+
+```text
+project_root/
+├── config.yaml
+├── main.py
+├── conda_envs/
+│   └── ATAC_env/
+├── data/
+│   ├── Alignments/10plusway-master.hal
+│   ├── Human_Pancreas_ATAC/peak/idr_reproducibility/idr.optimal_peak.narrowPeak
+│   ├── Mouse_Pancreas_ATAC/peak/idr_reproducibility/idr.optimal_peak.narrowPeak
+│   ├── HumanGenomeInfo/hg38.fa
+│   ├── HumanGenomeInfo/gencode.v27.annotation.protTranscript.TSSsWithStrand_sorted.bed
+│   ├── MouseGenomeInfo/mm10.fa
+│   └── MouseGenomeInfo/gencode.vM15.annotation.protTranscript.TSSWithStrand_sorted.bed
+├── pipeline/
+│   ├── utils.py
+│   ├── halper.py
+│   ├── bed_genome.py
+│   ├── bed_promoter_enhancer.py
+│   ├── homer.py
+│   └── r_scripts/
+│       ├── rGREAT.R
+│       └── plot_rGREAT.R
+└── tools/
+    └── halLiftover-postprocessing/
+```
+
+Everything under `output/` can be created by the pipeline.
+
+## Notes on Naming Consistency
+
+Use consistent folder names across the config and scripts.
+
+Recommended:
+
+```text
+output/rgreat/
+```
+
+Avoid mixing this with:
+
+```text
+output/rGreat/
+```
+
+The current config uses lowercase:
+
+```yaml
+rgreat_output_dir: "output/rgreat"
+rgreat_temp_dir: "output/rgreat/temp"
+```
+
+Similarly, avoid using a single shared temp folder such as:
+
+```text
+output/temp/
+```
+
+The current pipeline uses script-specific temp folders:
+
+```text
+output/halper/temp/
+output/bed/temp/
+output/bed_pe/temp/
+output/homer/temp/
+output/rgreat/temp/
+```
+
+## How to Run the Pipeline:
+There are multiple parts in this pipeline. They can be run all at once or separately. First navigate to the project top directory from terminal.
+
+```bash
 cd path_to_project_top_dir
 ```
-To run all steps at once:
-```Bash
+
+To run all steps:
+
+```bash
 python3 main.py --run all
 ```
 
-However, if you wish to run steps separately, the first step is still mandatory for the downstream analysis:
-```Bash
+To run only HALPER:
+
+```bash
 python3 main.py --run halper
+```
+
+To run multiple selected steps:
+
+```bash
+python3 main.py --run bed_g bed_pe homer
 ```
 
 For other functions, replace the keyword after `--run` with the following:
 
-| Keyword | Function|
+| Keyword | Function |
 | -------- | -------- |
-| halper | Run halLiftover+halper to map peaks from source to target species in both direction|
-| bed_pe   | Run bed pipeline to separate peaks into likely enhancers and likely promoters |
-| bed_g | Run bed pipeline to find OCRs that are species specific or shared |
-| homer | Run homer for finding sequence pattern |
+| halper | Run halLiftover and HALPER to map peaks from source to target species in both directions |
+| bed_g | Run BEDTools to find shared and species-specific OCRs |
+| bed_pe | Run BEDTools to separate OCRs into likely enhancers and likely promoters |
+| homer | Run HOMER motif enrichment analysis |
+| rgreat all | Run all rGREAT tasks |
+| rgreat Human_full | Run rGREAT only for full human OCRs |
+| rgreat Mouse_full | Run rGREAT only for full mouse OCRs |
+| rgreat HtM_shared | Run rGREAT only for human-to-mouse shared OCRs |
+| rgreat HtM_human_specific | Run rGREAT only for human-specific OCRs in the human-to-mouse direction |
+| rgreat MtH_shared | Run rGREAT only for mouse-to-human shared OCRs |
+| rgreat MtH_mouse_specific | Run rGREAT only for mouse-specific OCRs in the mouse-to-human direction |
+| plot_rgreat all | Plot all rGREAT results |
+| plot_rgreat HtM_shared | Plot one selected rGREAT result |
 
+Examples:
 
-
-
-## Workflow summary
-
-### 1\. Peak preparation using `HalLiftover` and `Halper`
-
-#### Input: 
-- `idr.optimal_peak.narrowPeak` or `idr.conservative_peak`.narrowPeak from both human and mouse. These are all the 
-
-#### What the pipeline does:
-
-- The pipeline first maps reproducible ATAC-seq peaks between species using `halLiftover` and `HALPER`. Starting from the `idr.optimal_peak.narrowPeak` files, peaks are lifted over in both directions: from human to mouse and from mouse to human.
-
-- `halLiftover` uses a multiple-species genome alignment in HAL format to project each peak’s genomic coordinates from one species onto the other genome. Because raw liftover can produce fragmented or partial mappings, `HALPER` is then used to post-process these lifted regions, reconstructing orthologous regulatory elements in a more consistent and interpretable way.
-
-- Running the mapping in both directions helps reduce directional bias and provides a more complete set of orthologous open chromatin regions for downstream comparison.
-
-#### Output:
-
-- Mapped OCR peak sets in the other species’ genome coordinates, including human-to-mouse and mouse-to-human orthologous peak regions, ready for overlap and conservation analysis.
-
-### 2\. Identify shared and species-specific mapped peaks using `BEDTools`
-
-#### Input:
-
-- Mapped OCR peak sets `idr.optimal_peak.SourcetoTarget.HALPER.narrowPeak` generated from step 1. There should be one for Human to Mouse mapping and one from the other direction.
-
-#### What the pipline does:
-
-- The pipeline uses the `bed_intersect` function from `BEDTools` to compare the mapped peak sets and determine which OCRs are shared between species and which are species-specific. Peaks that overlap between the compared mapped sets are classified as shared peaks. Peaks that do not overlap a corresponding region in the other species are classified as species-specific peaks. The `-v` flag is used to find species specific peaks, and the `-u` flag is used to find overlapping but unique peeaks.
-
-#### Output:
-
-If ran in both direction, there should be a set of these output for each direction:
-- shared_ocrs.bed
-- mapped_not_open_in_target.bed
-
-For example if we run Human (source) to Mouse (target), we will get one bed file for shared ocr, and one for Human specific peaks that are not open in mouse.
-
-
-### 3\. Functional annotation of OCR sets using rGREAT
-#### Input: 
-
-For both directions from source_species to target_species:
-- shared OCRs: `shared_ocrs.bed`
-- Source Species Specific OCRs: `mapped_not_open_in_target_species.bed`
-- background information: `mapped_source_species_halper.bed`
-
-#### What the pipeline does:
-The rGreat pipeline will analyze two sets of regions
-- shared OCRs: conserved accessible regions between species
-- species specific OCRs: regions mapped to target_species but not accessible in source_species.
-
-The pipeline look at these regions and analyze their biological functions. 
-
-#### Output:
-For shared region: `shared_GO_BP.tsv` and `shared_great_object.rds`
-For specific region: `specific_GO_BP.tsv` and `specific_great_object.rds`
-The pipeline will also take the tsv file and plot bubble plot for the top genes. 
+```bash
+python3 main.py --run rgreat all
+python3 main.py --run rgreat HtM_shared
+python3 main.py --run rgreat all plot_rgreat all
+python3 main.py --run plot_rgreat MtH_mouse_specific
+```
 
 ---
 
-### 4\. Separate Peaks into likely-Enhancer or likely-Promoters
+
+### 1. Peak preparation using `halLiftover` and `HALPER`
+
 #### Input:
-This step comes right after running halper, so we need two files:
-mapped peak: `idr.optimal_peak.SourceToTarget.HALPER.narrowPeak`
-original peak of Target species: `idr.optimal_peak.narrowPeak`
-
-You also need to define a promoter distance threshold (`default = 2000bp`)
-
-To distinguish promoter from enhancer in species specific peaks, we also need information about the locations of Transcription Start Sties for that particular species.
-- for human specific: `gencode.v27.annotation.protTranscript.TSSsWithStrand_sorted.bed`
-- for mice specific: `gencode.vM15.annotation.protTranscript.geneNames_TSSWithStrand_sorted.bed`
+- Human `idr.optimal_peak.narrowPeak`
+- Mouse `idr.optimal_peak.narrowPeak`
+- HAL multiple-genome alignment file
+- HALPER postprocessing repository
 
 #### What the pipeline does:
-The pipeline first use `bedtools_closest ` to classify peaks into likely promoters and likely enhancer based on the distance threshold.
+The pipeline maps reproducible ATAC-seq peaks between species using `halLiftover` and `HALPER`.
 
-After dividing the mapped OCRs into promoter-like and enhancer-like sets in each species, it uses the `-u` flag in `bedtools_intersect` to compare the corresponding classes across species and determine which promoter-like and enhancer-like OCRs were shared. 
+Starting from the `idr.optimal_peak.narrowPeak` files, peaks are lifted over in both directions:
 
-Finally, to identify species_specific OCRs within each class, it uses the `-v` flag in `bedtools_intersect` to subtract the shared OCRs from the full mapped OCR set for that class. 
+- Human to Mouse
+- Mouse to Human
+
+`halLiftover` uses a multiple-species genome alignment in HAL format to project each peak’s genomic coordinates from one species onto the other genome. Because raw liftover can produce fragmented or partial mappings, `HALPER` is then used to postprocess these lifted regions and reconstruct orthologous regulatory elements.
+
+Running the mapping in both directions helps reduce directional bias and provides two coordinate-specific sets for downstream comparison.
 
 #### Output:
-For both SourceToTarget direction, the result will look different but the outputted files are the same:
-- `bed_pe_source_pancrea_to_target.out.txt` contains summary of the result.
-- `species_enhancer_ocrs.bed` and `species_promoter_ocrs.bed`
-- `species_specific_enhancer_ocrs.bed` and `species_specific_promoter_ocrs.bed`
-- `shared_enhancer_ocrs.bed` and `shared_promoter_ocrs.bed`
+For Human to Mouse:
 
-### 5\. Finding frequent sequence pattern:
+```text
+output/halper/HtM/idr.optimal_peak.HumanToMouse.HALPER.narrowPeak
+```
+
+For Mouse to Human:
+
+```text
+output/halper/MtH/idr.optimal_peak.MouseToHuman.HALPER.narrowPeak
+```
+
+The HALPER temp directory stores temporary BED and liftover files:
+
+```text
+output/halper/temp/
+```
+
+---
+
+### 2. Identify shared and species-specific mapped peaks using `BEDTools`
+
 #### Input:
-- all or part of the output files from step 4, depending on your analysis goal. 
-- A FASTA genome reference file: Human (hg18, hg19, hg38), Mouse (mm8, mm9, mm10)
+- Human-to-Mouse HALPER output:
+  - `output/halper/HtM/idr.optimal_peak.HumanToMouse.HALPER.narrowPeak`
+- Mouse-to-Human HALPER output:
+  - `output/halper/MtH/idr.optimal_peak.MouseToHuman.HALPER.narrowPeak`
+- Native target species peak file:
+  - Mouse peaks for the Human-to-Mouse direction
+  - Human peaks for the Mouse-to-Human direction
 
-#### What the piprline does:
-Using the `findMotifsGenome.pl` function from Homer, identifies enriched de novo and known DNA motifs within genomic regions (BED files). It extracts sequences from a specified genome, accounts for background sequence composition (GC content), and produces HTML reports of motif enrichment. 
+#### What the pipeline does:
+The pipeline uses `bedtools intersect` to compare mapped OCRs against native OCRs in the target species.
+
+For each direction:
+
+- `-u` reports mapped OCRs that overlap at least one native target OCR. These are classified as shared OCRs.
+- `-v` reports mapped OCRs that do not overlap native target OCRs. These are classified as species-specific OCRs.
+
+For Human to Mouse:
+
+- shared OCRs are mapped human OCRs that overlap native mouse OCRs
+- human-specific OCRs are mapped human OCRs that do not overlap native mouse OCRs
+
+For Mouse to Human:
+
+- shared OCRs are mapped mouse OCRs that overlap native human OCRs
+- mouse-specific OCRs are mapped mouse OCRs that do not overlap native human OCRs
 
 #### Output:
-- One `.html` files for each of the input. 
+For Human to Mouse:
 
-## To Cite this repository
+```text
+output/bed/HtM/shared_ocrs.bed
+output/bed/HtM/human_specific_ocrs.bed
+output/bed/HtM/summary.txt
+```
+
+For Mouse to Human:
+
+```text
+output/bed/MtH/shared_ocrs.bed
+output/bed/MtH/mouse_specific_ocrs.bed
+output/bed/MtH/summary.txt
+```
+
+Intermediate files are stored in:
+
+```text
+output/bed/temp/
+```
+
+---
+
+### 3. Functional annotation of OCR sets using rGREAT
+
+#### Input:
+For full species analysis:
+
+- Human full OCRs:
+  - `species_1_peak_file`
+- Mouse full OCRs:
+  - `species_2_peak_file`
+
+For cross-species comparison:
+
+- Human to Mouse:
+  - `output/bed/HtM/shared_ocrs.bed`
+  - `output/bed/HtM/human_specific_ocrs.bed`
+
+- Mouse to Human:
+  - `output/bed/MtH/shared_ocrs.bed`
+  - `output/bed/MtH/mouse_specific_ocrs.bed`
+
+#### What the pipeline does:
+The rGREAT pipeline submits each OCR set to GREAT and retrieves enriched Gene Ontology Biological Process terms.
+
+Genome builds are chosen based on the coordinate system of the input file:
+
+- Human full OCRs use `hg38`
+- Mouse full OCRs use `mm10`
+- Human-to-Mouse mapped regions use `mm10`
+- Mouse-to-Human mapped regions use `hg38`
+
+The rGREAT tasks can be run all at once or individually through `main.py`.
+
+#### Output:
+Example outputs:
+
+```text
+output/rgreat/Human_full/human_full_GO_BP.tsv
+output/rgreat/Mouse_full/mouse_full_GO_BP.tsv
+output/rgreat/HtM_shared/htm_shared_GO_BP.tsv
+output/rgreat/HtM_human_specific/htm_human_specific_GO_BP.tsv
+output/rgreat/MtH_shared/mth_shared_GO_BP.tsv
+output/rgreat/MtH_mouse_specific/mth_mouse_specific_GO_BP.tsv
+```
+
+The plotting script generates PDF bubble plots in:
+
+```text
+output/rgreat/plots/
+```
+
+---
+
+### 4. Separate peaks into likely enhancers and likely promoters
+
+#### Input:
+This step uses:
+
+- HALPER mapped peak file:
+  - `idr.optimal_peak.SourceToTarget.HALPER.narrowPeak`
+- Native target species peak file:
+  - `idr.optimal_peak.narrowPeak`
+- Target species TSS annotation file
+- Promoter distance threshold, default:
+  - `2000 bp`
+
+For Human to Mouse, the mapped OCRs are in mouse coordinates, so the mouse TSS file is used.
+
+For Mouse to Human, the mapped OCRs are in human coordinates, so the human TSS file is used.
+
+#### What the pipeline does:
+The pipeline uses `bedtools closest` with the `-d` option to find the nearest transcription start site for each OCR.
+
+OCRs are classified as:
+
+- promoter-like if the nearest TSS is within the promoter threshold
+- enhancer-like if the nearest TSS is farther than the promoter threshold
+
+After classifying mapped OCRs and native target OCRs into promoter-like and enhancer-like groups, the pipeline compares the corresponding classes across species.
+
+For each class:
+
+- `bedtools intersect -u` identifies shared promoter-like or enhancer-like OCRs
+- `bedtools intersect -v` identifies source-species-specific promoter-like or enhancer-like OCRs
+
+#### Output:
+For Human to Mouse:
+
+```text
+output/bed_promoter_enhancer/HtM/shared_promoter_ocrs.bed
+output/bed_promoter_enhancer/HtM/shared_enhancer_ocrs.bed
+output/bed_promoter_enhancer/HtM/human_specific_promoter_ocrs.bed
+output/bed_promoter_enhancer/HtM/human_specific_enhancer_ocrs.bed
+output/bed_promoter_enhancer/HtM/summary.txt
+```
+
+For Mouse to Human:
+
+```text
+output/bed_promoter_enhancer/MtH/shared_promoter_ocrs.bed
+output/bed_promoter_enhancer/MtH/shared_enhancer_ocrs.bed
+output/bed_promoter_enhancer/MtH/mouse_specific_promoter_ocrs.bed
+output/bed_promoter_enhancer/MtH/mouse_specific_enhancer_ocrs.bed
+output/bed_promoter_enhancer/MtH/summary.txt
+```
+
+Intermediate files are stored in:
+
+```text
+output/bed_pe/temp/
+```
+
+---
+
+### 5. Finding enriched sequence motifs using HOMER
+
+#### Input:
+HOMER uses BED files from the promoter/enhancer step and genome FASTA files.
+
+Example input sets:
+
+- shared enhancer OCRs
+- human-specific enhancer OCRs
+- mouse-specific enhancer OCRs
+- promoter OCRs
+- enhancer OCRs
+
+Genome FASTA files:
+
+- Human genome FASTA, for example `hg38.fa`
+- Mouse genome FASTA, for example `mm10.fa`
+
+#### What the pipeline does:
+The pipeline uses `findMotifsGenome.pl` from HOMER to identify enriched de novo and known DNA motifs within genomic regions.
+
+`findMotifsGenome.pl` is used because the inputs are genomic intervals in BED format.
+
+For Human-to-Mouse outputs, the regions are in mouse coordinates, so the mouse genome is used.
+
+For Mouse-to-Human outputs, the regions are in human coordinates, so the human genome is used.
+
+#### Output:
+Each HOMER run produces one output directory containing HTML reports and motif result files.
+
+Example output folders:
+
+```text
+output/homer/shared_enhancer_htm/
+output/homer/human_specific_enhancer_htm/
+output/homer/shared_enhancer_mth/
+output/homer/mouse_specific_enhancer_mth/
+```
+
+HOMER job scripts and logs are stored in:
+
+```text
+output/homer/temp/
+```
+
+---
+
+## Notes on Slurm Jobs
+Most pipeline steps generate Slurm job scripts and submit them using `sbatch`.
+
+You do not need to manually enter an interactive node with `interact` for normal pipeline runs.
+
+Use `interact` only for debugging commands manually on a compute node.
+
+---
+
+## To Cite this Repository
 Ji A, Fang K, Huang Z. Pancrea_OCR_Analysis. GitHub repository, branch SF. 2026. Available at: https://github.com/BioinformaticsDataPracticum2026/Pancrea_OCR_Analysis
-

@@ -1,145 +1,178 @@
+# run with:
+# Rscript pipeline/r_scripts/rGREAT.R Human_full
+# Rscript pipeline/r_scripts/rGREAT.R Mouse_full
+# Rscript pipeline/r_scripts/rGREAT.R HtM_shared
+# Rscript pipeline/r_scripts/rGREAT.R HtM_human_specific
+# Rscript pipeline/r_scripts/rGREAT.R MtH_shared
+# Rscript pipeline/r_scripts/rGREAT.R MtH_mouse_specific
+
+user_lib <- path.expand("~/R/library")
+dir.create(user_lib, recursive = TRUE, showWarnings = FALSE)
+.libPaths(c(user_lib, .libPaths()))
+
 suppressPackageStartupMessages({
   library(rGREAT)
   library(rtracklayer)
   library(yaml)
 })
 
+resolve_path <- function(project_root, path) {
+  if (grepl("^/", path)) {
+    return(path)
+  }
+  file.path(project_root, path)
+}
+
 load_config <- function(config_path = "config.yaml") {
-  yaml::read_yaml(config_path)
-}
-
-validate_run_mode <- function(run_mode) {
-  if (!run_mode %in% c("shared", "not_open")) {
-    stop("run_mode must be either 'shared' or 'not_open'")
-  }
-}
-
-get_comparison_config <- function(cfg, comparison) {
-  comp_cfg <- cfg$rgreat$comparisons[[comparison]]
-
-  if (is.null(comp_cfg)) {
-    stop(paste("comparison", comparison, "not found in config.yaml"))
+  if (!file.exists(config_path)) {
+    stop("config.yaml not found. Run this script from the project root.")
   }
 
-  comp_cfg
-}
+  cfg <- yaml::read_yaml(config_path)
 
-get_input_file <- function(comp_cfg, run_mode) {
-  switch(
-    run_mode,
-    shared = comp_cfg$shared_file,
-    not_open = comp_cfg$not_open_file
-  )
-}
-
-read_peak_sets <- function(infile, bg_file) {
-  gr <- import(infile)
-  bg_gr <- import(bg_file)
-  list(gr = gr, bg_gr = bg_gr)
-}
-
-run_great <- function(gr, bg_gr, genome_build) {
-  great(
-    gr,
-    "GO:BP",
-    paste0("GREAT:", genome_build),
-    background = bg_gr
-  )
-}
-
-save_great_results <- function(res, label, outdir) {
-  dir.create(outdir, recursive = TRUE, showWarnings = FALSE)
-
-  tb <- getEnrichmentTable(res)
-
-  write.table(
-    tb,
-    file = file.path(outdir, paste0(label, "_GO_BP.tsv")),
-    sep = "\t",
-    row.names = FALSE,
-    quote = FALSE
-  )
-
-  saveRDS(
-    res,
-    file.path(outdir, paste0(label, "_great_object.rds"))
-  )
-}
-
-run_great_analysis <- function(infile, bg_file, label, outdir, genome_build) {
-  cat("Reading input for:", label, "\n")
-  flush.console()
-
-  peak_sets <- read_peak_sets(infile, bg_file)
-  gr <- peak_sets$gr
-  bg_gr <- peak_sets$bg_gr
-
-  cat(label, "peaks:", length(gr), "\n")
-  cat("Background peaks:", length(bg_gr), "\n")
-  flush.console()
-
-  cat("Running GREAT for:", label, "\n")
-  flush.console()
-
-  res <- run_great(gr, bg_gr, genome_build)
-  save_great_results(res, label, outdir)
-
-  cat("Finished:", label, "\n")
-  flush.console()
-
-  rm(gr, bg_gr, res, peak_sets)
-  gc()
-}
-
-run_one_comparison_mode <- function(cfg, comparison, run_mode) {
-  validate_run_mode(run_mode)
-
-  comp_cfg <- get_comparison_config(cfg, comparison)
-  infile <- get_input_file(comp_cfg, run_mode)
-  outdir <- file.path(comp_cfg$base_outdir, run_mode)
-
-  cat("====================================\n")
-  cat("Comparison:", comparison, "\n")
-  cat("Run mode:", run_mode, "\n")
-  cat("Genome build:", comp_cfg$genome_build, "\n")
-  cat("Input file:", infile, "\n")
-  cat("Background file:", comp_cfg$background_file, "\n")
-  cat("Output dir:", outdir, "\n")
-  cat("====================================\n")
-  flush.console()
-
-  run_great_analysis(
-    infile = infile,
-    bg_file = comp_cfg$background_file,
-    label = run_mode,
-    outdir = outdir,
-    genome_build = comp_cfg$genome_build
-  )
-}
-
-run_all_comparison_modes <- function(config_path = "config.yaml", comparisons = NULL) {
-  cfg <- load_config(config_path)
-
-  if (is.null(comparisons)) {
-    comparisons <- names(cfg$rgreat$comparisons)
+  if (is.null(cfg$project_root)) {
+    cfg$project_root <- getwd()
   }
 
-  run_modes <- c("shared", "not_open")
+  cfg$project_root <- normalizePath(cfg$project_root, mustWork = TRUE)
 
-  for (comparison in comparisons) {
-    for (run_mode in run_modes) {
-      run_one_comparison_mode(cfg, comparison, run_mode)
+  path_keys <- c(
+    "species_1_peak_file",
+    "species_2_peak_file",
+    "bed_output_dir_htm",
+    "bed_output_dir_mth",
+    "rgreat_output_dir",
+    "rgreat_temp_dir"
+  )
+
+  for (key in path_keys) {
+    if (is.null(cfg[[key]])) {
+      stop(paste("Missing config key:", key))
     }
+    cfg[[key]] <- resolve_path(cfg$project_root, cfg[[key]])
   }
 
-  cat("Done.\n")
-  flush.console()
+  dir.create(cfg$rgreat_output_dir, recursive = TRUE, showWarnings = FALSE)
+  dir.create(cfg$rgreat_temp_dir, recursive = TRUE, showWarnings = FALSE)
+
+  cfg
 }
 
-# ===============================
-# Call at the end
-# ===============================
-run_all_comparison_modes(
-  config_path = "config.yaml",
-  comparisons = c("HtM", "MtH")
+get_task_info <- function(cfg, task) {
+  htm_shared <- file.path(cfg$bed_output_dir_htm, "shared_ocrs.bed")
+  htm_human_specific <- file.path(cfg$bed_output_dir_htm, "human_specific_ocrs.bed")
+
+  mth_shared <- file.path(cfg$bed_output_dir_mth, "shared_ocrs.bed")
+  mth_mouse_specific <- file.path(cfg$bed_output_dir_mth, "mouse_specific_ocrs.bed")
+
+  if (task == "Human_full") {
+    return(list(
+      infile = cfg$species_1_peak_file,
+      outdir = file.path(cfg$rgreat_output_dir, "Human_full"),
+      label = "human_full",
+      genome = "hg38"
+    ))
+  }
+
+  if (task == "Mouse_full") {
+    return(list(
+      infile = cfg$species_2_peak_file,
+      outdir = file.path(cfg$rgreat_output_dir, "Mouse_full"),
+      label = "mouse_full",
+      genome = "mm10"
+    ))
+  }
+
+  if (task == "HtM_shared") {
+    return(list(
+      infile = htm_shared,
+      outdir = file.path(cfg$rgreat_output_dir, "HtM_shared"),
+      label = "htm_shared",
+      genome = "mm10"
+    ))
+  }
+
+  if (task == "HtM_human_specific") {
+    return(list(
+      infile = htm_human_specific,
+      outdir = file.path(cfg$rgreat_output_dir, "HtM_human_specific"),
+      label = "htm_human_specific",
+      genome = "mm10"
+    ))
+  }
+
+  if (task == "MtH_shared") {
+    return(list(
+      infile = mth_shared,
+      outdir = file.path(cfg$rgreat_output_dir, "MtH_shared"),
+      label = "mth_shared",
+      genome = "hg38"
+    ))
+  }
+
+  if (task == "MtH_mouse_specific") {
+    return(list(
+      infile = mth_mouse_specific,
+      outdir = file.path(cfg$rgreat_output_dir, "MtH_mouse_specific"),
+      label = "mth_mouse_specific",
+      genome = "hg38"
+    ))
+  }
+
+  stop(paste("Unknown task:", task))
+}
+
+args <- commandArgs(trailingOnly = TRUE)
+
+if (length(args) < 1) {
+  stop(
+    paste(
+      "Missing task.",
+      "Valid tasks:",
+      "Human_full, Mouse_full, HtM_shared, HtM_human_specific, MtH_shared, MtH_mouse_specific"
+    )
+  )
+}
+
+task <- args[1]
+
+cfg <- load_config()
+info <- get_task_info(cfg, task)
+
+if (!file.exists(info$infile)) {
+  stop(paste("Input file not found:", info$infile))
+}
+
+dir.create(info$outdir, recursive = TRUE, showWarnings = FALSE)
+
+message("Running rGREAT")
+message("Task: ", task)
+message("Input file: ", info$infile)
+message("Genome: ", info$genome)
+message("Output directory: ", info$outdir)
+
+gr <- rtracklayer::import(info$infile)
+
+job <- submitGreatJob(
+  gr,
+  genome = info$genome,
+  help = FALSE
 )
+
+tbl <- getEnrichmentTables(
+  job,
+  ontology = "GO Biological Process"
+)
+
+outfile <- file.path(info$outdir, paste0(info$label, "_GO_BP.tsv"))
+
+write.table(
+  tbl,
+  file = outfile,
+  sep = "\t",
+  row.names = FALSE,
+  quote = FALSE
+)
+
+message("Finished rGREAT")
+message("Output file: ", outfile)
