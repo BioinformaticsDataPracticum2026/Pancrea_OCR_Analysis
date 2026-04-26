@@ -1,13 +1,14 @@
 from pathlib import Path
 import textwrap
+
 from utils import load_config, submit_job
+
 
 def make_job_script(
     mapped_file,
     target_peak_file,
     output_dir,
     temp_dir,
-    log_dir,
     job_name,
     source_label,
     target_label,
@@ -29,28 +30,27 @@ def make_job_script(
         {source_label}_specific_ocrs.bed
             Mapped source OCRs that do not overlap native target OCRs.
 
-        mapped_vs_{target_label}.coverage.txt
-            Coverage statistics comparing mapped source OCRs against native target OCRs.
-
         summary.txt
-            Count summary and definitions.
+            Count summary.
 
     Temporary files:
         mapped_halper.bed
         target_atac.bed
         sorted versions
 
-    Temporary files are placed in output/temp/{job_name}_work and removed after completion.
+    Temporary files are placed in {temp_dir}/{job_name}_work and removed after completion.
+    Logs are placed in {temp_dir}/logs.
     """
-    
+
     mapped_file = Path(mapped_file)
     target_peak_file = Path(target_peak_file)
     output_dir = Path(output_dir)
     temp_dir = Path(temp_dir)
-    log_dir = Path(log_dir)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     temp_dir.mkdir(parents=True, exist_ok=True)
+
+    log_dir = temp_dir / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
 
     source_display = source_label.capitalize()
@@ -86,6 +86,7 @@ def make_job_script(
 
     module load bedtools/2.30.0
 
+    rm -rf {work_dir}
     mkdir -p {work_dir}
     mkdir -p {output_dir}
 
@@ -170,8 +171,7 @@ def main():
         mapped_file=config["mapped_htm_file"],
         target_peak_file=config["mouse_peak_file"],
         output_dir=config["bed_output_dir_htm"],
-        temp_dir=config["temp_dir"],
-        log_dir=config["log_dir"],
+        temp_dir=config["bed_g_temp_dir"],
         job_name="bed_human_pancreas_to_mouse",
         source_label="human",
         target_label="mouse",
@@ -181,8 +181,7 @@ def main():
         mapped_file=config["mapped_mth_file"],
         target_peak_file=config["human_peak_file"],
         output_dir=config["bed_output_dir_mth"],
-        temp_dir=config["temp_dir"],
-        log_dir=config["log_dir"],
+        temp_dir=config["bed_g_temp_dir"],
         job_name="bed_mouse_pancreas_to_human",
         source_label="mouse",
         target_label="human",

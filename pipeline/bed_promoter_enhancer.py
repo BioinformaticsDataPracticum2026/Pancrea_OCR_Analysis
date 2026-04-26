@@ -1,28 +1,152 @@
 from pathlib import Path
 import textwrap
+
 from utils import load_config, submit_job
 
-def make_job_script(
+
+def make_species_pe_job(
+    peak_file,
+    tss_file,
+    output_dir,
+    temp_dir,
+    job_name,
+    species_label,
+    promoter_threshold,
+):
+    """
+    Classify native species OCRs into promoter-like and enhancer-like OCRs.
+
+    Final outputs:
+        {species_label}_promoter_ocrs.bed
+        {species_label}_enhancer_ocrs.bed
+        summary.txt
+    """
+
+    peak_file = Path(peak_file)
+    tss_file = Path(tss_file)
+    output_dir = Path(output_dir)
+    temp_dir = Path(temp_dir)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    temp_dir.mkdir(parents=True, exist_ok=True)
+
+    log_dir = temp_dir / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    species_display = species_label.capitalize()
+
+    job_script = temp_dir / f"{job_name}.job"
+    out_log = log_dir / f"{job_name}.out.txt"
+    err_log = log_dir / f"{job_name}.err.txt"
+
+    work_dir = temp_dir / f"{job_name}_work"
+
+    ocr_bed = work_dir / f"{species_label}_ocrs.bed"
+    ocr_bed_sorted = work_dir / f"{species_label}_ocrs.sorted.bed"
+    tss_sorted = work_dir / f"{species_label}_tss.sorted.bed"
+    closest_file = work_dir / f"{species_label}_with_nearest_tss.bed"
+
+    promoter_file = output_dir / f"{species_label}_promoter_ocrs.bed"
+    enhancer_file = output_dir / f"{species_label}_enhancer_ocrs.bed"
+    summary_txt = output_dir / "summary.txt"
+
+    script_text = textwrap.dedent(f"""\
+    #!/bin/bash
+    #SBATCH -p RM-shared
+    #SBATCH -t 04:00:00
+    #SBATCH --ntasks-per-node=4
+    #SBATCH --job-name={job_name}
+    #SBATCH --output={out_log}
+    #SBATCH --error={err_log}
+
+    set -euo pipefail
+
+    module load bedtools/2.30.0
+
+    rm -rf {work_dir}
+    mkdir -p {work_dir}
+    mkdir -p {output_dir}
+
+    echo "Running full species promoter/enhancer classification"
+    echo "Species: {species_display}"
+    echo "Peak file: {peak_file}"
+    echo "TSS file: {tss_file}"
+    echo "Promoter threshold: {promoter_threshold} bp"
+    echo ""
+
+    awk 'BEGIN{{OFS="\\t"}} {{print $1,$2,$3,"{species_label}_peak_"NR}}' {peak_file} > {ocr_bed}
+
+    sort -k1,1 -k2,2n {ocr_bed} > {ocr_bed_sorted}
+    sort -k1,1 -k2,2n {tss_file} > {tss_sorted}
+
+    bedtools closest \\
+      -a {ocr_bed_sorted} \\
+      -b {tss_sorted} \\
+      -d \\
+      > {closest_file}
+
+    awk 'BEGIN{{OFS="\\t"}} $NF <= {promoter_threshold} {{print $1,$2,$3,$4}}' {closest_file} > {promoter_file}
+    awk 'BEGIN{{OFS="\\t"}} $NF >  {promoter_threshold} {{print $1,$2,$3,$4}}' {closest_file} > {enhancer_file}
+
+    total_ocrs=$(wc -l < {ocr_bed_sorted})
+    promoter_n=$(wc -l < {promoter_file})
+    enhancer_n=$(wc -l < {enhancer_file})
+
+    {{
+        echo "Species: {species_display}"
+        echo "Promoter threshold bp: {promoter_threshold}"
+        echo "Total {species_label} OCRs: $total_ocrs"
+        echo "{species_display} promoter OCRs: $promoter_n"
+        echo "{species_display} enhancer OCRs: $enhancer_n"
+    }} > {summary_txt}
+
+    cat {summary_txt}
+
+    rm -rf {work_dir}
+
+    echo "Full species promoter/enhancer classification finished"
+    """)
+
+    with open(job_script, "w") as f:
+        f.write(script_text)
+
+    job_script.chmod(0o755)
+    return job_script
+
+
+def make_mapped_pe_job(
     mapped_file,
     target_peak_file,
     target_tss_file,
     output_dir,
     temp_dir,
-    log_dir,
     job_name,
     source_label,
     target_label,
     promoter_threshold,
 ):
+    """
+    Classify mapped source OCRs and native target OCRs into promoter/enhancer sets,
+    then identify shared and source-specific promoter/enhancer OCRs.
+
+    Final outputs:
+        shared_promoter_ocrs.bed
+        shared_enhancer_ocrs.bed
+        {source_label}_specific_promoter_ocrs.bed
+        {source_label}_specific_enhancer_ocrs.bed
+        summary.txt
+    """
+
     mapped_file = Path(mapped_file)
     target_peak_file = Path(target_peak_file)
     target_tss_file = Path(target_tss_file)
     output_dir = Path(output_dir)
     temp_dir = Path(temp_dir)
-    log_dir = Path(log_dir)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     temp_dir.mkdir(parents=True, exist_ok=True)
+
+    log_dir = temp_dir / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
 
     source_display = source_label.capitalize()
@@ -44,8 +168,9 @@ def make_job_script(
     mapped_closest = work_dir / "mapped_with_nearest_tss.bed"
     target_closest = work_dir / f"{target_label}_with_nearest_tss.bed"
 
-    mapped_promoter = work_dir / "mapped_promoter_ocrs.bed"
-    mapped_enhancer = work_dir / "mapped_enhancer_ocrs.bed"
+    mapped_promoter = work_dir / f"mapped_{source_label}_promoter_ocrs.bed"
+    mapped_enhancer = work_dir / f"mapped_{source_label}_enhancer_ocrs.bed"
+
     target_promoter = work_dir / f"{target_label}_promoter_ocrs.bed"
     target_enhancer = work_dir / f"{target_label}_enhancer_ocrs.bed"
 
@@ -70,10 +195,11 @@ def make_job_script(
 
     module load bedtools/2.30.0
 
+    rm -rf {work_dir}
     mkdir -p {work_dir}
     mkdir -p {output_dir}
 
-    echo "Running promoter/enhancer BEDTools analysis"
+    echo "Running mapped promoter/enhancer BEDTools analysis"
     echo "Direction: {source_display} to {target_display}"
     echo "Mapped HALPER file: {mapped_file}"
     echo "Native target ATAC peak file: {target_peak_file}"
@@ -156,7 +282,7 @@ def make_job_script(
 
     rm -rf {work_dir}
 
-    echo "Promoter/enhancer BEDTools analysis finished"
+    echo "Mapped promoter/enhancer BEDTools analysis finished"
     """)
 
     with open(job_script, "w") as f:
@@ -168,64 +294,94 @@ def make_job_script(
 
 def main():
     config = load_config(
-    path_keys=[
-        "mapped_htm_file",
-        "mapped_mth_file",
-        "mouse_peak_file",
-        "human_peak_file",
-        "mouse_tss_file",
-        "human_tss_file",
-        "bed_pe_output_dir_htm",
-        "bed_pe_output_dir_mth",
-        "bed_pe_temp_dir",
-    ],
-    required_paths=[
-        "mapped_htm_file",
-        "mapped_mth_file",
-        "mouse_peak_file",
-        "human_peak_file",
-        "mouse_tss_file",
-        "human_tss_file",
-    ],
-    mkdir_keys=[
-        "bed_pe_output_dir_htm",
-        "bed_pe_output_dir_mth",
-        "bed_pe_temp_dir",
-    ],
+        path_keys=[
+            "mapped_htm_file",
+            "mapped_mth_file",
+            "mouse_peak_file",
+            "human_peak_file",
+            "mouse_tss_file",
+            "human_tss_file",
+            "bed_pe_output_dir_htm",
+            "bed_pe_output_dir_mth",
+            "bed_pe_output_dir_human",
+            "bed_pe_output_dir_mouse",
+            "bed_pe_temp_dir",
+        ],
+        required_paths=[
+            "mapped_htm_file",
+            "mapped_mth_file",
+            "mouse_peak_file",
+            "human_peak_file",
+            "mouse_tss_file",
+            "human_tss_file",
+        ],
+        mkdir_keys=[
+            "bed_pe_output_dir_htm",
+            "bed_pe_output_dir_mth",
+            "bed_pe_output_dir_human",
+            "bed_pe_output_dir_mouse",
+            "bed_pe_temp_dir",
+        ],
     )
-    print("BEDTools config loaded successfully.")
 
-    htm_job = make_job_script(
+    print("Promoter/enhancer BEDTools config loaded successfully.")
+
+    human_full_job = make_species_pe_job(
+        peak_file=config["human_peak_file"],
+        tss_file=config["human_tss_file"],
+        output_dir=config["bed_pe_output_dir_human"],
+        temp_dir=config["bed_pe_temp_dir"],
+        job_name="bed_pe_human_full",
+        species_label="human",
+        promoter_threshold=config.get("promoter_threshold", 2000),
+    )
+
+    mouse_full_job = make_species_pe_job(
+        peak_file=config["mouse_peak_file"],
+        tss_file=config["mouse_tss_file"],
+        output_dir=config["bed_pe_output_dir_mouse"],
+        temp_dir=config["bed_pe_temp_dir"],
+        job_name="bed_pe_mouse_full",
+        species_label="mouse",
+        promoter_threshold=config.get("promoter_threshold", 2000),
+    )
+
+    htm_job = make_mapped_pe_job(
         mapped_file=config["mapped_htm_file"],
         target_peak_file=config["mouse_peak_file"],
         target_tss_file=config["mouse_tss_file"],
         output_dir=config["bed_pe_output_dir_htm"],
         temp_dir=config["bed_pe_temp_dir"],
-        log_dir=config["log_dir"],
         job_name="bed_pe_human_pancreas_to_mouse",
         source_label="human",
         target_label="mouse",
         promoter_threshold=config.get("promoter_threshold", 2000),
     )
 
-    mth_job = make_job_script(
+    mth_job = make_mapped_pe_job(
         mapped_file=config["mapped_mth_file"],
         target_peak_file=config["human_peak_file"],
         target_tss_file=config["human_tss_file"],
         output_dir=config["bed_pe_output_dir_mth"],
         temp_dir=config["bed_pe_temp_dir"],
-        log_dir=config["log_dir"],
         job_name="bed_pe_mouse_pancreas_to_human",
         source_label="mouse",
         target_label="human",
         promoter_threshold=config.get("promoter_threshold", 2000),
     )
 
-    print(f"Generated: {htm_job}")
-    print(f"Generated: {mth_job}")
+    jobs = [
+        human_full_job,
+        mouse_full_job,
+        htm_job,
+        mth_job,
+    ]
 
-    submit_job(htm_job)
-    submit_job(mth_job)
+    for job in jobs:
+        print(f"Generated: {job}")
+
+    for job in jobs:
+        submit_job(job)
 
 
 if __name__ == "__main__":

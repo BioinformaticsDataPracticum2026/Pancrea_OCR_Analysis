@@ -35,11 +35,13 @@ human_tss_file: "data/HumanGenomeInfo/gencode.v27.annotation.protTranscript.TSSs
 # Promoter/enhancer BED output folders
 bed_pe_output_dir_htm: "output/bed_promoter_enhancer/HtM"
 bed_pe_output_dir_mth: "output/bed_promoter_enhancer/MtH"
+bed_pe_output_dir_human: "output/bed_promoter_enhancer/Human_full"
+bed_pe_output_dir_mouse: "output/bed_promoter_enhancer/Mouse_full"
 
 promoter_threshold: 2000
 
 bed_g_temp_dir: "output/bed/temp"
-bed_pe_temp_dir: "output/bed_pe/temp"
+bed_pe_temp_dir: "output/bed_promoter_enhancer/temp"
 
 
 # For running rGREAT
@@ -81,26 +83,26 @@ rgreat:
 
 
 # HOMER inputs
-# Native species enhancer/promoter files
-# Only keep these if your promoter/enhancer script actually outputs these files.
-mouse_enhancer_file: "output/bed_promoter_enhancer/HtM/mouse_enhancer_ocrs.bed"
-human_enhancer_file: "output/bed_promoter_enhancer/MtH/human_enhancer_ocrs.bed"
 
-mouse_promoter_file: "output/bed_promoter_enhancer/HtM/mouse_promoter_ocrs.bed"
-human_promoter_file: "output/bed_promoter_enhancer/MtH/human_promoter_ocrs.bed"
+# Full species enhancer/promoter files from bed_pe
+human_enhancer_file: "output/bed_promoter_enhancer/Human_full/human_enhancer_ocrs.bed"
+mouse_enhancer_file: "output/bed_promoter_enhancer/Mouse_full/mouse_enhancer_ocrs.bed"
 
-# Shared enhancer files
+human_promoter_file: "output/bed_promoter_enhancer/Human_full/human_promoter_ocrs.bed"
+mouse_promoter_file: "output/bed_promoter_enhancer/Mouse_full/mouse_promoter_ocrs.bed"
+
+# Shared enhancer files from mapped comparison
 shared_enhancer_htm_file: "output/bed_promoter_enhancer/HtM/shared_enhancer_ocrs.bed"
 shared_enhancer_mth_file: "output/bed_promoter_enhancer/MtH/shared_enhancer_ocrs.bed"
 
-# Source-specific enhancer files
+# Species-specific enhancer files from mapped comparison
 human_specific_enhancer_htm_file: "output/bed_promoter_enhancer/HtM/human_specific_enhancer_ocrs.bed"
 mouse_specific_enhancer_mth_file: "output/bed_promoter_enhancer/MtH/mouse_specific_enhancer_ocrs.bed"
 
 # Genome FASTA files
-mouse_genome_fasta: "data/MouseGenomeInfo/mm10.fa"
 human_genome_fasta: "data/HumanGenomeInfo/hg38.fa"
+mouse_genome_fasta: "data/MouseGenomeInfo/mm10.fa"
 
-# HOMER output/temp folders
+# HOMER output and temp folders
 homer_output_dir: "output/homer"
 homer_temp_dir: "output/homer/temp"
