@@ -1,5 +1,5 @@
 data/
-conda_envs/
+ATAC_env/
 output/
 logs/
 .venv/

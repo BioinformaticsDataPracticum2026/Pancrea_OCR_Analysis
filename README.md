@@ -34,35 +34,46 @@ If the required software is not installed on the cluster or device you are using
 
 ---
 
-# Project Directory Structure and Setup Guide
+## Table of Contents (Navigate to sections)
+- [Project structure](#project-structure)
+- [Conda environment setup](#conda-environment-setup)
+- [Tools](#tools)
+- [Configuration](#configuration)
+- [Input data](#input-data)
+- [Running the pipeline](#running-the-pipeline)
+  - [Step 1: HAL liftover and HALPER](#step-1-hal-liftover-and-halper)
+  - [Step 2: Shared and species-specific OCRs](#step-2-shared-and-species-specific-ocrs)
+  - [Step 3: Promoter and enhancer classification](#step-3-promoter-and-enhancer-classification)
+  - [Step 4: rGREAT analysis](#step-4-rgreat-analysis)
+  - [Step 5: HOMER motif analysis](#step-5-homer-motif-analysis)
+- [Output files](#output-files)
+- [Notes](#notes)
 
-## Suggested Project Directory Tree
+## Project Directory Structure and Setup Guide
 
-This project should be organized from one top-level project directory, referred to as `project_root` in `config.yaml`.
-
-
-## What the User Needs to Set Up
-
-There are two types of folders in this project:
-
-1. folders and files that must be prepared before running the pipeline
-2. folders that can be created automatically by the scripts
-
-## Required Files and Folders
-
-The following files and folders should exist before running the pipeline. Check if these files exist after cloning the repo and modify them if necessary
-
-### Code and Configuration
+### Directory Structure Tree
+Below is the ideal directory structure. The config file assume that the folders are arranged this way. Therefore, it is recommended to set your directory like this (otherwise you need to change the config file):
 
 ```text
-config.yaml
-main.py
-README.md
-pipeline/
-tools/
+Pancrea_OCR_Analysis/
+├── ATAC_env/
+├── data/
+├── output/
+│   ├── bed/
+│   ├── bed_promoter_enhancer/
+│   ├── halper/
+│   ├── homer/
+│   └── rgreat/
+├── pipeline/
+├── tools/
+├── config.yaml
+├── environment.yml
+├── main.py
+└── README.md
 ```
+Everything under `output/` can be created by the pipeline.
 
-The `pipeline/` folder should contain the Python and R scripts used by the pipeline:
+After installing the repo, verify that the `pipeline/` folder contains the Python and R scripts used by the pipeline:
 
 ```text
 pipeline/
@@ -75,36 +86,59 @@ pipeline/
     ├── rGREAT.R
     └── plot_rGREAT.R
 ```
-
-### HALPER Repository
-
-The HALPER postprocessing repository should be placed here:
+Download all necessary tools/software under the tools folder:
 
 ```text
-tools/halLiftover-postprocessing/
+tools/
+├── bedtools2/
+├── hal/
+├── halLiftover-postprocessing/
+├── homer/
+└── sonLib/
 ```
 
-This should match the following config entry:
+## Conda environment setup
 
-```yaml
-halper_repo: "tools/halLiftover-postprocessing"
+This project uses a Conda environment defined in `environment.yml`.
+
+
+### Load Conda on the cluster
+
+On Bridges-2, Conda may not be available by default in a new shell. First load the Anaconda module:
+
+```bash
+module spider anaconda
+module load anaconda3
+source "$(conda info --base)/etc/profile.d/conda.sh"
 ```
 
-### Conda Environment
+### Option 1: Create the environment by name
 
-The conda environment should be available here:
-
-```text
-conda_envs/ATAC_env/
+```bash
+conda env create -f environment.yml
+conda activate ATAC_env
 ```
 
-This should match the following config entry:
+This creates an environment named `ATAC_env` in Conda's default environment location.
 
-```yaml
-conda_env: "conda_envs/ATAC_env"
+### Option 2: Create the environment inside the project folder
+
+```bash
+conda env create -p ./ATAC_env -f environment.yml
+conda activate ./ATAC_env
 ```
 
-### Input Data
+This creates the environment inside a local `conda_envs` folder in the repository, which matches the folder structure used in this project.
+
+### Verify the installation
+
+After activation, check that the required Python packages are available:
+
+```bash
+python -c "import numpy, matplotlib, yaml, pandas, scipy; print('Environment setup successful')"
+```
+
+## Input Data
 
 The user must provide the main biological input files in the `data/` directory.
 
@@ -217,38 +251,6 @@ rgreat_temp_dir: "output/rgreat/temp"
 conda_env: "conda_envs/ATAC_env"
 ```
 
-## Minimum Setup Checklist
-
-Before running the pipeline, confirm that the following exist:
-
-```text
-project_root/
-├── config.yaml
-├── main.py
-├── conda_envs/
-│   └── ATAC_env/
-├── data/
-│   ├── Alignments/10plusway-master.hal
-│   ├── Human_Pancreas_ATAC/peak/idr_reproducibility/idr.optimal_peak.narrowPeak
-│   ├── Mouse_Pancreas_ATAC/peak/idr_reproducibility/idr.optimal_peak.narrowPeak
-│   ├── HumanGenomeInfo/hg38.fa
-│   ├── HumanGenomeInfo/gencode.v27.annotation.protTranscript.TSSsWithStrand_sorted.bed
-│   ├── MouseGenomeInfo/mm10.fa
-│   └── MouseGenomeInfo/gencode.vM15.annotation.protTranscript.TSSWithStrand_sorted.bed
-├── pipeline/
-│   ├── utils.py
-│   ├── halper.py
-│   ├── bed_genome.py
-│   ├── bed_promoter_enhancer.py
-│   ├── homer.py
-│   └── r_scripts/
-│       ├── rGREAT.R
-│       └── plot_rGREAT.R
-└── tools/
-    └── halLiftover-postprocessing/
-```
-
-Everything under `output/` can be created by the pipeline.
 
 ## Notes on Naming Consistency
 
@@ -289,7 +291,7 @@ output/homer/temp/
 output/rgreat/temp/
 ```
 
-## How to Run the Pipeline:
+# How to Run the Pipeline:
 There are multiple parts in this pipeline. They can be run all at once or separately. First navigate to the project top directory from terminal.
 
 ```bash
@@ -610,3 +612,15 @@ Use `interact` only for debugging commands manually on a compute node.
 
 ## To Cite this Repository
 Ji A, Fang K, Huang Z. Pancrea_OCR_Analysis. GitHub repository, branch SF. 2026. Available at: https://github.com/BioinformaticsDataPracticum2026/Pancrea_OCR_Analysis
+
+## Citations for the software we used.
+
+1. Hickey G, Paten B, Earl D, et al. HAL: a hierarchical format for storing and analyzing multiple genome alignments. *Bioinformatics*. 2013;29(10):1341-1342. https://academic.oup.com/bioinformatics/article/29/10/1341/256598
+
+2. Zhang M, Vicario DS, Rivas MV, et al. HALPER facilitates the identification of regulatory element orthologs across species. *Bioinformatics*. 2020;36(15):4339-4340.
+
+3. Quinlan AR, Hall IM. BEDTools: a flexible suite of utilities for comparing genomic features. *Bioinformatics*. 2010;26(6):841-842. https://academic.oup.com/bioinformatics/article/26/6/841/244688
+
+4. Heinz S, Benner C, Spann N, et al. Simple combinations of lineage-determining transcription factors prime cis-regulatory elements required for macrophage and B cell identities. *Molecular Cell*. 2010;38(4):576-589. https://pubmed.ncbi.nlm.nih.gov/20513432/
+
+5. Gu Z, Hübschmann D. rGREAT: an R/Bioconductor package for functional enrichment on genomic regions. *Bioinformatics*. 2023;39(1):btac745. https://academic.oup.com/bioinformatics/article/39/1/btac745/6832038

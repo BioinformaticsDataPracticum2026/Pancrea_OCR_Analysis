@@ -3,6 +3,7 @@ species_2: "Mouse"
 organ: "Pancreas"
 
 project_root: "/ocean/projects/bio230007p/jji5"
+conda_env: "ATAC_env"
 
 # For running HALPER (relative paths, make sure to set up the folder as instrcuted in the github repo.)
 halper_repo: "tools/halLiftover-postprocessing"
@@ -16,7 +17,6 @@ halper_output_dir_mth: "output/halper/MtH"
 
 halper_temp_dir: "output/halper/temp"
 
-conda_env: "conda_envs/ATAC_env"
 
 # For running bed
 mapped_htm_file: "output/halper/HtM/idr.optimal_peak.HumanToMouse.HALPER.narrowPeak"
@@ -25,8 +25,8 @@ mouse_peak_file: "data/Mouse_Pancreas_ATAC/peak/idr_reproducibility/idr.optimal_
 mapped_mth_file: "output/halper/MtH/idr.optimal_peak.MouseToHuman.HALPER.narrowPeak"
 human_peak_file: "data/Human_Pancreas_ATAC/peak/idr_reproducibility/idr.optimal_peak.narrowPeak"
 
-bed_output_dir_htm: "output/bed/HtM"
-bed_output_dir_mth: "output/bed/MtH"
+bed_output_dir_htm: "output/bed_genome/HtM"
+bed_output_dir_mth: "output/bed_genome/MtH"
 
 # TSS annotation files
 mouse_tss_file: "data/MouseGenomeInfo/gencode.vM15.annotation.protTranscript.geneNames_TSSWithStrand_sorted.bed"
@@ -40,7 +40,7 @@ bed_pe_output_dir_mouse: "output/bed_promoter_enhancer/Mouse_full"
 
 promoter_threshold: 2000
 
-bed_g_temp_dir: "output/bed/temp"
+bed_g_temp_dir: "output/bed_genome/temp"
 bed_pe_temp_dir: "output/bed_promoter_enhancer/temp"
 
 
