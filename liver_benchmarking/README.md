@@ -12,20 +12,24 @@ This folder contains code from the Green team's repo. I copied it over for two r
 
 The Green team does basically the same kind of analysis we do (ATAC-seq OCR, HALPER mapping, motif analysis, rGREAT), just on a different tissue. Running their code on our side accomplishes a few things:
 
-- Helps debug their pipeline — code that runs on the original author's machine doesn't always run elsewhere
-- Sanity-checks our own methodology
-- Lets us compare results across tissues
-- Confirms our compute environment is set up correctly
+- Helps debug their pipeline. Code that runs on the original author's machine doesn't always run elsewhere.
+- Sanity-checks our own methodology.
+- Lets us compare results across tissues.
+- Confirms our compute environment is set up correctly.
 
 ## What's in here
 
-- `scripts/` — 5 shell scripts: HALPER mapping, motif analysis, PE classification, plotting, rGREAT
-- `r_scripts/` — 2 R scripts for rGREAT analysis and plotting
+- scripts/ - 5 shell scripts: HALPER mapping, motif analysis, PE classification, plotting, rGREAT
+- r_scripts/ - 2 R scripts for rGREAT analysis and plotting
 
 ## What I changed
 
-To get the code running under our environment (PSC Bridges-2, our directory layout), I had to change a few things. The specifics are in `CHANGES.md`. The analysis logic itself is unchanged.
+To get the code running under our environment (PSC Bridges-2, our directory layout), I had to change a few things. The specifics are in CHANGES.md. The analysis logic itself is unchanged.
 
 Any bugs or issues I ran into during testing will be written up in the course report feedback to share with the Green team.
+
+## To Cite the Original Repository
+
+Green team (Bioinformatics Data Practicum 2026). liver-ATAC-OCR. GitHub repository. 2026. Available at: https://github.com/BioinformaticsDataPracticum2026/liver-ATAC-OCR
 
 — Ziyi
