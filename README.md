@@ -51,6 +51,7 @@ If the required software is not installed on the cluster or device you are using
 - [Notes on Slurm Jobs](#notes-on-slurm-jobs)
 - [To Cite this Repository](#to-cite-this-repository)
 - [Citations for the software we used.](#citations-for-the-software-we-used)
+- [Gen AI usage](#gen-ai-usage)
 
 ## Project Directory Structure and Setup Guide
 
@@ -125,14 +126,15 @@ conda activate ATAC_env
 
 This creates an environment named `ATAC_env` in Conda's default environment location.
 
-### Option 2: Create the environment inside the project folder
+### Option 2 (Recommended): Create the environment inside the project folder
 
 ```bash
 conda env create -p ./ATAC_env -f environment.yml
 conda activate ./ATAC_env
 ```
+(Received feedback from multiple users that Option2 is better.)
 
-This creates the environment inside a local `conda_envs` folder in the repository, which matches the folder structure used in this project.
+This creates the environment inside a local `conda_envs` folder in the repository, which matches the folder structure used in this project. 
 
 ### Verify the installation
 
@@ -153,7 +155,7 @@ Required alignment file:
 data/Alignments/10plusway-master.hal
 ```
 
-Required ATAC-seq peak files (both optimal and conserved ok):
+Required ATAC-seq peak files (both optimal and conserved ok, but must be decompressed! .gz file will not work.):
 
 ```text
 data/Human_Pancreas_ATAC/peak/idr_reproducibility/idr.optimal_peak.narrowPeak
@@ -637,3 +639,9 @@ Ji A, Fang K, Huang Z. Pancrea_OCR_Analysis. GitHub repository, branch SF. 2026.
 5. Gu Z, Hübschmann D. rGREAT: an R/Bioconductor package for functional enrichment on genomic regions. *Bioinformatics*. 2023;39(1):btac745. https://academic.oup.com/bioinformatics/article/39/1/btac745/6832038
 
 [Back to Table of Contents](#table-of-contents)
+
+## Gen AI Usage:
+the `main.py`, `utils.py` and textwrapper are created by Chatgpt. All script text in `make_job_script` function in each script are created manually. 
+
+All the directory structure trees in this readme are also created by AI. The rest of the contents in readme are manually created by curated by AI for better format. 
+

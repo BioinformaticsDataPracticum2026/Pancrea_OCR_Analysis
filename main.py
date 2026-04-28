@@ -107,7 +107,14 @@ def parse_run_steps(run_tokens):
         token = run_tokens[i]
 
         if token == "all":
-            parsed_steps.extend(ALL_PIPELINE_STEPS)
+            parsed_steps.extend([
+                ("halper", None),
+                ("bed_g", None),
+                ("bed_pe", None),
+                ("homer", None),
+                ("rgreat", "all"),
+                ("plot_rgreat", None),
+            ])
             i += 1
             continue
 
