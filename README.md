@@ -24,7 +24,7 @@ The overall goal is to assess how chromatin accessibility and regulatory archite
 ## Prerequisites and Installation:
 This project is being developed on Bridges-2, a Linux HPC cluster. Therefore, it is best to run the pipeline on a cluster with a similar level of computational power and software environment.
 
-If the required software is not installed on the cluster or device you are using, install them following the instructions below:
+If the required software is not installed on the cluster or device you are using, install them following the instructions below （also see [Tools](#tools)）:
 
 - HAL / halLiftover: https://github.com/ComparativeGenomicsToolkit/hal
 - HALPER postprocessing: https://github.com/pfenninglab/halLiftover-postprocessing
@@ -34,20 +34,23 @@ If the required software is not installed on the cluster or device you are using
 
 ---
 
-## Table of Contents (Navigate to sections)
-- [Project structure](#project-structure)
+## Table of Contents
+
+- [Project Directory Structure and Setup Guide](#project-directory-structure-and-setup-guide)
 - [Conda environment setup](#conda-environment-setup)
-- [Tools](#tools)
-- [Configuration](#configuration)
-- [Input data](#input-data)
-- [Running the pipeline](#running-the-pipeline)
-  - [Step 1: HAL liftover and HALPER](#step-1-hal-liftover-and-halper)
-  - [Step 2: Shared and species-specific OCRs](#step-2-shared-and-species-specific-ocrs)
-  - [Step 3: Promoter and enhancer classification](#step-3-promoter-and-enhancer-classification)
-  - [Step 4: rGREAT analysis](#step-4-rgreat-analysis)
-  - [Step 5: HOMER motif analysis](#step-5-homer-motif-analysis)
-- [Output files](#output-files)
-- [Notes](#notes)
+- [Input Data](#input-data)
+- [Output Folders](#output-folders)
+- [Config File Requirements](#config-file-requirements)
+- [Notes on Naming Consistency](#notes-on-naming-consistency)
+- [How to Run the Pipeline](#how-to-run-the-pipeline)
+  - [1. Peak preparation using halLiftover and HALPER](#1-peak-preparation-using-halliftover-and-halper)
+  - [2. Identify shared and species-specific mapped peaks using BEDTools](#2-identify-shared-and-species-specific-mapped-peaks-using-bedtools)
+  - [3. Functional annotation of OCR sets using rGREAT](#3-functional-annotation-of-ocr-sets-using-rgreat)
+  - [4. Separate peaks into likely enhancers and likely promoters](#4-separate-peaks-into-likely-enhancers-and-likely-promoters)
+  - [5. Finding enriched sequence motifs using HOMER](#5-finding-enriched-sequence-motifs-using-homer)
+- [Notes on Slurm Jobs](#notes-on-slurm-jobs)
+- [To Cite this Repository](#to-cite-this-repository)
+- [Citations for the software we used.](#citations-for-the-software-we-used)
 
 ## Project Directory Structure and Setup Guide
 
@@ -96,6 +99,7 @@ tools/
 ├── homer/
 └── sonLib/
 ```
+[Back to Table of Contents](#table-of-contents)
 
 ## Conda environment setup
 
@@ -137,6 +141,7 @@ After activation, check that the required Python packages are available:
 ```bash
 python -c "import numpy, matplotlib, yaml, pandas, scipy; print('Environment setup successful')"
 ```
+[Back to Table of Contents](#table-of-contents)
 
 ## Input Data
 
@@ -174,6 +179,7 @@ Optional motif database or reference data:
 ```text
 data/CIS-BP_2.00/
 ```
+[Back to Table of Contents](#table-of-contents)
 
 ## Output Folders
 
@@ -203,6 +209,8 @@ output/rgreat/temp/
 
 This prevents intermediate files from different scripts from being mixed together.
 
+[Back to Table of Contents](#table-of-contents)
+
 ## Config File Requirements
 
 The `config.yaml` file should define `project_root` and then use relative paths from that project root.
@@ -211,6 +219,7 @@ Example:
 
 ```yaml
 project_root: "/ocean/projects/bio230007p/project_folder"
+conda_env: "ATAC_env"
 
 species_1: "Human"
 species_2: "Mouse"
@@ -248,9 +257,8 @@ homer_temp_dir: "output/homer/temp"
 rgreat_output_dir: "output/rgreat"
 rgreat_temp_dir: "output/rgreat/temp"
 
-conda_env: "conda_envs/ATAC_env"
 ```
-
+[Back to Table of Contents](#table-of-contents)
 
 ## Notes on Naming Consistency
 
@@ -290,6 +298,7 @@ output/bed_pe/temp/
 output/homer/temp/
 output/rgreat/temp/
 ```
+[Back to Table of Contents](#table-of-contents)
 
 # How to Run the Pipeline:
 There are multiple parts in this pipeline. They can be run all at once or separately. First navigate to the project top directory from terminal.
@@ -342,6 +351,7 @@ python3 main.py --run rgreat HtM_shared
 python3 main.py --run rgreat all plot_rgreat all
 python3 main.py --run plot_rgreat MtH_mouse_specific
 ```
+[Back to Table of Contents](#table-of-contents)
 
 ---
 
@@ -598,6 +608,7 @@ HOMER job scripts and logs are stored in:
 ```text
 output/homer/temp/
 ```
+[Back to Table of Contents](#table-of-contents)
 
 ---
 
@@ -624,3 +635,5 @@ Ji A, Fang K, Huang Z. Pancrea_OCR_Analysis. GitHub repository, branch SF. 2026.
 4. Heinz S, Benner C, Spann N, et al. Simple combinations of lineage-determining transcription factors prime cis-regulatory elements required for macrophage and B cell identities. *Molecular Cell*. 2010;38(4):576-589. https://pubmed.ncbi.nlm.nih.gov/20513432/
 
 5. Gu Z, Hübschmann D. rGREAT: an R/Bioconductor package for functional enrichment on genomic regions. *Bioinformatics*. 2023;39(1):btac745. https://academic.oup.com/bioinformatics/article/39/1/btac745/6832038
+
+[Back to Table of Contents](#table-of-contents)
