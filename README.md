@@ -1,7 +1,7 @@
 # ATAC-seq Project README
 
 ## Overview
-This project analyzes ATAC-seq open chromatin regions (OCRs) across two species to identify conserved and species-specific regulatory elements. The workflow focuses on:
+This project analyzes ATAC-seq open chromatin regions (OCRs) across mouse & human to identify conserved and species-specific regulatory elements. The workflow focuses on:
 
 - mapping OCR peak files between species using halLiftover and HALPER
 - identifying shared and species-specific OCRs with BEDTools
