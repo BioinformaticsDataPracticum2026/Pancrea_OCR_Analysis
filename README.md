@@ -643,5 +643,5 @@ Ji A, Fang K, Huang Z. Pancrea_OCR_Analysis. GitHub repository, branch SF. 2026.
 ## Gen AI Usage:
 the `main.py`, `utils.py` and textwrapper are created by Chatgpt. All script text in `make_job_script` function in each script are created manually. 
 
-All the directory structure trees in this readme are also created by AI. The rest of the contents in readme are manually created by curated by AI for better format. 
+All the directory structure trees in this readme are also created by AI. The rest of the contents in readme are mostly manually created and then curated by AI for better formatting. 
 
